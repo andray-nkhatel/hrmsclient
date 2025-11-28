@@ -3,7 +3,14 @@ import axios from 'axios';
 
 // Get API base URL from environment variable
 function getApiBaseUrl() {
-  const envUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+  // In production (when served from same server), use relative URLs
+  // In development, use the configured URL or default to port 8070
+  if (import.meta.env.PROD) {
+    // When served from the same origin, use relative URLs
+    return '';
+  }
+  
+  const envUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8070';
   
   if (import.meta.env.DEV) {
     console.log('✅ Using API base URL:', envUrl);
