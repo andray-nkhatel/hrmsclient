@@ -178,6 +178,15 @@ export const authService = {
     return response.data;
   },
 
+  async getProfile() {
+    const user = getCurrentUser();
+    if (!user || !user.id) {
+      throw new Error('User not authenticated');
+    }
+    const response = await apiClient.get(`/api/employees/${user.id}`);
+    return response.data;
+  },
+
   logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
