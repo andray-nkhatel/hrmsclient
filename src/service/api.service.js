@@ -3,20 +3,29 @@ import axios from 'axios';
 
 // Get API base URL from environment variable
 function getApiBaseUrl() {
+  // If explicitly set via environment variable, use it
+  if (import.meta.env.VITE_API_BASE_URL) {
+    const envUrl = import.meta.env.VITE_API_BASE_URL;
+    if (import.meta.env.DEV) {
+      console.log('✅ Using API base URL from env:', envUrl);
+    }
+    return envUrl;
+  }
+  
   // In production (when served from same server), use relative URLs
-  // In development, use the configured URL or default to port 8070
+  // This allows the frontend to work when served from the same origin as the API
   if (import.meta.env.PROD) {
-    // When served from the same origin, use relative URLs
+    // When served from the same origin, use relative URLs (empty string)
+    // This eliminates CORS issues since requests go to the same server
     return '';
   }
   
-  const envUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8070';
-  
+  // Development default: use port 8070 (matching docker-compose)
+  const defaultUrl = 'http://localhost:8070';
   if (import.meta.env.DEV) {
-    console.log('✅ Using API base URL:', envUrl);
+    console.log('✅ Development mode: Using API base URL:', defaultUrl);
   }
-  
-  return envUrl;
+  return defaultUrl;
 }
 
 // Create axios instance
@@ -133,11 +142,16 @@ apiClient.interceptors.response.use(
       
       if (isCorsError) {
         const frontendOrigin = window.location.origin;
-        const backendUrl = apiClient.defaults.baseURL;
+        const backendUrl = apiClient.defaults.baseURL || window.location.origin;
         
-        let errorMessage = `CORS Configuration Error: The backend API at ${backendUrl} is not configured to allow requests from ${frontendOrigin}.`;
+        let errorMessage;
+        if (!apiClient.defaults.baseURL || apiClient.defaults.baseURL === '') {
+          errorMessage = `Connection Error: Unable to reach the API server at ${frontendOrigin}. Please ensure the server is running.`;
+        } else {
+          errorMessage = `CORS Configuration Error: The backend API at ${backendUrl} is not configured to allow requests from ${frontendOrigin}.`;
+        }
         
-        console.error('🚫 CORS Error:', { frontendOrigin, backendUrl });
+        console.error('🚫 Connection Error:', { frontendOrigin, backendUrl: backendUrl || '(same origin)' });
         
         const corsError = new Error(errorMessage);
         corsError.isCorsError = true;
