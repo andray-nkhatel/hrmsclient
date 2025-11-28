@@ -33,9 +33,18 @@ const login = async () => {
     loading.value = true;
 
     try {
+        // Trim whitespace from inputs
+        const trimmedUsername = username.value?.trim() || '';
+        const trimmedNrc = nrc.value?.trim() || '';
+        const trimmedPassword = password.value?.trim() || '';
+        
         const credentials = isAdmin 
-            ? { username: username.value, password: password.value }
-            : { nrc: nrc.value, password: password.value };
+            ? { username: trimmedUsername, password: trimmedPassword }
+            : { nrc: trimmedNrc, password: trimmedPassword };
+        
+        if (import.meta.env.DEV) {
+            console.log('🔐 Attempting login:', { isAdmin, credentials: { ...credentials, password: '***' } });
+        }
             
         await store.dispatch('auth/login', credentials);
 
@@ -66,17 +75,22 @@ const login = async () => {
                 sticky: true
             });
         } else if (error.response && error.response.status === 401) {
+            // 401 on login means invalid credentials
+            const errorMessage = error.response?.data?.error || 'Invalid credentials. Please check your username/NRC and password.';
             toast.add({
                 severity: 'error',
                 summary: 'Login Failed',
-                detail: 'Invalid credentials. Please check your details.',
+                detail: errorMessage,
                 life: 3000,
                 closable: true,
                 sticky: false
             });
         } else {
+            // Other errors
             let errorMessage = 'Invalid credentials';
-            if (error.response?.data?.error) {
+            if (error.userMessage) {
+                errorMessage = error.userMessage;
+            } else if (error.response?.data?.error) {
                 errorMessage = error.response.data.error;
             } else if (error.response?.data?.message) {
                 errorMessage = error.response.data.message;
@@ -135,7 +149,7 @@ const login = async () => {
                         </template>
                         
                         <label for="password" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Password</label>
-                        <Password id="password" v-model="password" placeholder="Password" :toggleMask="true" class="w-full mb-8" fluid :feedback="false"></Password>
+                        <Password id="password" v-model="password" placeholder="Password" :toggleMask="true" class="w-full mb-8" fluid :feedback="false" @keyup.enter="login"></Password>
                         
                         <Button type="submit" label="Sign In" class="w-full" :loading="loading"></Button>
                         

@@ -64,6 +64,12 @@ const router = createRouter({
                     meta: { requiresAuth: true, roles: ['manager', 'admin'] },
                     component: () => import('@/views/leaves/PendingLeaves.vue')
                 },
+                {
+                    path: 'leaves/:id/audit',
+                    name: 'leave-audit',
+                    meta: { requiresAuth: true, roles: ['manager', 'admin'] },
+                    component: () => import('@/views/leaves/LeaveAudit.vue')
+                },
                 // Admin Routes
                 {
                     path: 'admin/leave-types',

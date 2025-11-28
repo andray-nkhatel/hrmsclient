@@ -50,6 +50,11 @@ export default defineConfig({
         target: 'http://localhost:8070',
         changeOrigin: true,
         secure: false,
+        // Filter: only proxy POST/PUT/DELETE requests, not GET
+        filter: (pathname, req) => {
+          // Only proxy non-GET requests to /auth endpoints
+          return req.method !== 'GET';
+        },
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {
             console.log('Proxy error:', err);

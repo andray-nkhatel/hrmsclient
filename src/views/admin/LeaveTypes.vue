@@ -57,7 +57,7 @@ const saveLeaveType = async () => {
         dialogVisible.value = false;
         await loadLeaveTypes();
     } catch (error) {
-        toast.add({ severity: 'error', summary: 'Error', detail: error.response?.data?.error || 'Operation failed', life: 3000 });
+        toast.add({ severity: 'error', summary: 'Error', detail: error.userMessage || error.response?.data?.error || 'Operation failed', life: 3000 });
     } finally {
         submitting.value = false;
     }

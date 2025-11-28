@@ -43,7 +43,8 @@ const loadLeaveTypes = async () => {
 const formatDateForApi = (date) => {
     if (!date) return null;
     const d = new Date(date);
-    return d.toISOString().split('T')[0] + 'T00:00:00Z';
+    // API expects date format: 2006-01-02 (YYYY-MM-DD)
+    return d.toISOString().split('T')[0];
 };
 
 const submitLeave = async () => {

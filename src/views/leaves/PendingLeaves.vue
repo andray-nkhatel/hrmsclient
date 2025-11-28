@@ -7,6 +7,9 @@ const toast = useToast();
 const leaves = ref([]);
 const loading = ref(true);
 const processing = ref(null);
+const rejectDialogVisible = ref(false);
+const selectedLeaveId = ref(null);
+const rejectionReason = ref('');
 
 const formatDate = (dateStr) => {
     return new Date(dateStr).toLocaleDateString();
@@ -56,22 +59,41 @@ const approveLeave = async (id) => {
     }
 };
 
-const rejectLeave = async (id) => {
-    processing.value = id;
+const openRejectDialog = (id) => {
+    selectedLeaveId.value = id;
+    rejectionReason.value = '';
+    rejectDialogVisible.value = true;
+};
+
+const rejectLeave = async () => {
+    if (!rejectionReason.value.trim()) {
+        toast.add({
+            severity: 'error',
+            summary: 'Validation Error',
+            detail: 'Please provide a reason for rejection',
+            life: 3000
+        });
+        return;
+    }
+
+    processing.value = selectedLeaveId.value;
     try {
-        await leaveService.reject(id);
+        await leaveService.reject(selectedLeaveId.value, rejectionReason.value);
         toast.add({
             severity: 'warn',
             summary: 'Rejected',
             detail: 'Leave request rejected',
             life: 3000
         });
+        rejectDialogVisible.value = false;
+        rejectionReason.value = '';
+        selectedLeaveId.value = null;
         await loadPendingLeaves();
     } catch (error) {
         toast.add({
             severity: 'error',
             summary: 'Error',
-            detail: error.response?.data?.error || 'Failed to reject leave',
+            detail: error.userMessage || error.response?.data?.error || 'Failed to reject leave',
             life: 3000
         });
     } finally {
@@ -117,7 +139,7 @@ onMounted(() => {
                     {{ formatDate(data.created_at) }}
                 </template>
             </Column>
-            <Column header="Actions" style="width: 200px">
+            <Column header="Actions" style="width: 250px">
                 <template #body="{ data }">
                     <div class="flex gap-2">
                         <Button icon="pi pi-check" severity="success" size="small" 
@@ -125,13 +147,34 @@ onMounted(() => {
                                 :loading="processing === data.id"
                                 v-tooltip="'Approve'" />
                         <Button icon="pi pi-times" severity="danger" size="small" 
-                                @click="rejectLeave(data.id)"
+                                @click="openRejectDialog(data.id)"
                                 :loading="processing === data.id"
                                 v-tooltip="'Reject'" />
+                        <Button icon="pi pi-history" severity="info" size="small" 
+                                @click="$router.push(`/app/leaves/${data.id}/audit`)"
+                                v-tooltip="'View Audit Trail'" />
                     </div>
                 </template>
             </Column>
         </DataTable>
+
+        <!-- Reject Leave Dialog -->
+        <Dialog v-model:visible="rejectDialogVisible" modal header="Reject Leave Request" 
+                :style="{ width: '500px' }" :closable="true">
+            <div class="mb-4">
+                <label class="block text-surface-900 dark:text-surface-0 font-medium mb-2">
+                    Rejection Reason <span class="text-red-500">*</span>
+                </label>
+                <Textarea v-model="rejectionReason" rows="4" class="w-full" 
+                          placeholder="Please provide a reason for rejecting this leave request..."
+                          :autoFocus="true" />
+            </div>
+            <template #footer>
+                <Button label="Cancel" severity="secondary" outlined @click="rejectDialogVisible = false" />
+                <Button label="Reject Leave" severity="danger" @click="rejectLeave" 
+                        :loading="processing === selectedLeaveId" />
+            </template>
+        </Dialog>
     </div>
 </template>
 

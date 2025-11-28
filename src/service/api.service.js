@@ -111,7 +111,8 @@ if (import.meta.env.DEV) {
 apiClient.interceptors.request.use(
   config => {
     const token = localStorage.getItem('token');
-    if (token && !config.url.includes('/auth/login')) {
+    // Don't attach token to auth endpoints
+    if (token && !config.url.includes('/auth/login') && !config.url.includes('/auth/admin/login') && !config.url.includes('/auth/register')) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     
@@ -149,12 +150,23 @@ apiClient.interceptors.response.use(
         console.error(`❌ ${status} ${url}`, isNonJsonResponse ? `[Non-JSON response]` : data);
       }    
       
-      // Handle unauthorized - redirect to login
+      // Handle unauthorized - but only redirect if it's NOT a login/register attempt
+      // Login/register 401s should show error message, not redirect
       if (status === 401) {
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        window.location.href = '/auth/login';
-        return Promise.reject(new Error('Session expired. Please log in again.'));
+        const isAuthEndpoint = url.includes('/auth/login') || 
+                              url.includes('/auth/admin/login') || 
+                              url.includes('/auth/register');
+        
+        if (!isAuthEndpoint) {
+          // Session expired on protected route - redirect to login
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          // Use hash routing for navigation
+          window.location.href = '/#/auth/login';
+          return Promise.reject(new Error('Session expired. Please log in again.'));
+        }
+        // For auth endpoints, just return the error without redirecting
+        // The login/register component will handle the error message
       }    
       
       // Handle forbidden
@@ -318,8 +330,20 @@ export const leaveService = {
   },
 
   // Reject leave (manager/admin)
-  async reject(id) {
-    const response = await apiClient.put(`/api/leaves/${id}/reject`);
+  async reject(id, reason) {
+    const response = await apiClient.put(`/api/leaves/${id}/reject`, { reason });
+    return response.data;
+  },
+
+  // Cancel leave (employee - own leaves only)
+  async cancel(id) {
+    const response = await apiClient.put(`/api/leaves/${id}/cancel`);
+    return response.data;
+  },
+
+  // Get leave audit trail (manager/admin)
+  async getAudit(id) {
+    const response = await apiClient.get(`/api/leaves/${id}/audit`);
     return response.data;
   }
 };
