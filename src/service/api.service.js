@@ -1,11 +1,34 @@
-// src/services/api.service.js
+// src/service/api.service.js
 import axios from 'axios';
 
 // Get API base URL from environment variable
 function getApiBaseUrl() {
+  const currentOrigin = window.location.origin;
+  const currentHostname = window.location.hostname;
+  const isNetworkAccess = currentHostname !== 'localhost' && currentHostname !== '127.0.0.1';
+  
   // If explicitly set via environment variable, use it
   if (import.meta.env.VITE_API_BASE_URL) {
-    const envUrl = import.meta.env.VITE_API_BASE_URL;
+    let envUrl = import.meta.env.VITE_API_BASE_URL;
+    
+    // If accessing from network IP and API URL uses localhost, replace with current hostname
+    if (isNetworkAccess && envUrl.includes('localhost')) {
+      try {
+        const url = new URL(envUrl);
+        url.hostname = currentHostname;
+        envUrl = url.toString();
+        if (import.meta.env.DEV) {
+          console.log('✅ Network access detected: Updated API URL from localhost to', currentHostname);
+        }
+      } catch (e) {
+        // If URL parsing fails, try simple string replacement
+        envUrl = envUrl.replace(/localhost/g, currentHostname);
+        if (import.meta.env.DEV) {
+          console.log('✅ Network access detected: Updated API URL from localhost to', currentHostname);
+        }
+      }
+    }
+    
     if (import.meta.env.DEV) {
       console.log('✅ Using API base URL from env:', envUrl);
     }
@@ -20,10 +43,23 @@ function getApiBaseUrl() {
     return '';
   }
   
-  // Development default: use port 8070 (matching docker-compose)
-  const defaultUrl = 'http://localhost:8070';
-  if (import.meta.env.DEV) {
-    console.log('✅ Development mode: Using API base URL:', defaultUrl);
+  // Development default: use port 8080 (or detect from current origin)
+  // If accessing from network IP, use the same hostname with port 8080
+  let defaultUrl;
+  if (isNetworkAccess) {
+    // Extract port from current origin or use default 8080
+    const currentPort = window.location.port;
+    // If frontend is on 8070, backend is likely on 8080
+    const backendPort = currentPort === '8070' ? '8080' : '8080';
+    defaultUrl = `http://${currentHostname}:${backendPort}`;
+    if (import.meta.env.DEV) {
+      console.log('✅ Network access detected: Using API base URL:', defaultUrl);
+    }
+  } else {
+    defaultUrl = 'http://localhost:8080';
+    if (import.meta.env.DEV) {
+      console.log('✅ Development mode: Using API base URL:', defaultUrl);
+    }
   }
   return defaultUrl;
 }
@@ -136,22 +172,45 @@ apiClient.interceptors.response.use(
     
     // Network errors
     if (error.request) {
+      const frontendOrigin = window.location.origin;
+      const backendUrl = apiClient.defaults.baseURL || window.location.origin;
+      
+      // Check for connection refused (backend not running or unreachable)
+      const isConnectionRefused = error.code === 'ERR_CONNECTION_REFUSED' || 
+                                  error.message?.includes('CONNECTION_REFUSED') ||
+                                  error.message?.includes('Failed to fetch');
+      
+      // Check for CORS errors
       const isCorsError = !error.response && 
+                         !isConnectionRefused &&
                          (error.message?.includes('CORS') || 
                           error.code === 'ERR_NETWORK');
       
-      if (isCorsError) {
-        const frontendOrigin = window.location.origin;
-        const backendUrl = apiClient.defaults.baseURL || window.location.origin;
+      if (isConnectionRefused) {
+        let errorMessage = `Connection Refused: Unable to reach the backend API at ${backendUrl}. `;
+        errorMessage += `Please ensure the backend server is running and accessible.`;
+        if (backendUrl.includes('localhost') && frontendOrigin.includes('192.168')) {
+          errorMessage += `\n\nNote: You're accessing the frontend from ${frontendOrigin}, but trying to connect to localhost. `;
+          errorMessage += `Make sure the backend is accessible at ${backendUrl.replace('localhost', window.location.hostname)}.`;
+        }
         
+        console.error('🚫 Connection Refused:', { frontendOrigin, backendUrl: backendUrl || '(same origin)' });
+        
+        const connectionError = new Error(errorMessage);
+        connectionError.isConnectionError = true;
+        return Promise.reject(connectionError);
+      }
+      
+      if (isCorsError) {
         let errorMessage;
         if (!apiClient.defaults.baseURL || apiClient.defaults.baseURL === '') {
           errorMessage = `Connection Error: Unable to reach the API server at ${frontendOrigin}. Please ensure the server is running.`;
         } else {
           errorMessage = `CORS Configuration Error: The backend API at ${backendUrl} is not configured to allow requests from ${frontendOrigin}.`;
+          errorMessage += `\n\nPlease configure the backend to allow CORS requests from ${frontendOrigin}.`;
         }
         
-        console.error('🚫 Connection Error:', { frontendOrigin, backendUrl: backendUrl || '(same origin)' });
+        console.error('🚫 CORS Error:', { frontendOrigin, backendUrl: backendUrl || '(same origin)' });
         
         const corsError = new Error(errorMessage);
         corsError.isCorsError = true;
