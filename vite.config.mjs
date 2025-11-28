@@ -28,15 +28,28 @@ export default defineConfig({
     global: 'globalThis',
   },
   // Development server proxy to bypass CORS issues
-  // To use the proxy in development, set VITE_API_BASE_URL=/api in .env.local
-  // The proxy will forward /api/* requests to the backend server
+  // The proxy will forward /api/* and /auth/* requests to the backend server
   server: {
+    host: '0.0.0.0', // Allow access from network
+    port: 5173, // Frontend dev server port (changed from 8070 to avoid conflict with backend)
     proxy: {
       '/api': {
-        target: 'https://bluebirdhub.somee.com',
+        target: 'http://localhost:8070',
         changeOrigin: true,
-        secure: true,
-        // Don't rewrite - keep /api in the path
+        secure: false,
+        configure: (proxy, _options) => {
+          proxy.on('error', (err, _req, _res) => {
+            console.log('Proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            console.log('Proxying request:', req.method, req.url, '->', proxyReq.path);
+          });
+        }
+      },
+      '/auth': {
+        target: 'http://localhost:8070',
+        changeOrigin: true,
+        secure: false,
         configure: (proxy, _options) => {
           proxy.on('error', (err, _req, _res) => {
             console.log('Proxy error:', err);

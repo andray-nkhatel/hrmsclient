@@ -43,7 +43,15 @@ function getApiBaseUrl() {
     return '';
   }
   
-  // Development default: use port 8080 (or detect from current origin)
+  // In development, use relative URLs to leverage Vite proxy
+  // This eliminates CORS issues by routing requests through the dev server
+  // The Vite proxy (configured in vite.config.mjs) will forward /api and /auth to the backend
+  if (import.meta.env.DEV) {
+    console.log('✅ Development mode: Using relative URLs (Vite proxy will handle routing)');
+    return '';
+  }
+  
+  // Fallback: use port 8080 (or detect from current origin)
   // If accessing from network IP, use the same hostname with port 8080
   let defaultUrl;
   if (isNetworkAccess) {
@@ -56,7 +64,7 @@ function getApiBaseUrl() {
       console.log('✅ Network access detected: Using API base URL:', defaultUrl);
     }
   } else {
-    defaultUrl = 'http://localhost:8080';
+    defaultUrl = 'http://localhost:8070';
     if (import.meta.env.DEV) {
       console.log('✅ Development mode: Using API base URL:', defaultUrl);
     }
