@@ -2,6 +2,9 @@
 import { employeeService } from '@/service/api.service';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
+import { useRouter } from 'vue-router';
+
+const router = useRouter();
 
 const toast = useToast();
 const employees = ref([]);
@@ -199,9 +202,17 @@ onMounted(() => loadEmployees());
                     <Tag :value="data.role" :severity="getRoleSeverity(data.role)" />
                 </template>
             </Column>
-            <Column header="Actions" style="width: 150px">
+            <Column header="Actions" style="width: 200px">
                 <template #body="{ data }">
                     <div class="flex gap-2">
+                        <Button 
+                            icon="pi pi-chart-line" 
+                            size="small" 
+                            severity="info" 
+                            outlined 
+                            @click="$router.push(`/app/hr/employees/${data.id}/annual-leave-balance`)"
+                            v-tooltip.top="'View Annual Leave Balance'"
+                        />
                         <Button icon="pi pi-pencil" size="small" outlined @click="openEdit(data)" />
                         <Button icon="pi pi-trash" size="small" severity="danger" outlined @click="deleteEmployee(data.id)" />
                     </div>

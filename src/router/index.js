@@ -82,6 +82,43 @@ const router = createRouter({
                     name: 'employees',
                     meta: { requiresAuth: true, roles: ['admin'] },
                     component: () => import('@/views/admin/Employees.vue')
+                },
+                // HR Leave Management Routes (Manager/Admin)
+                {
+                    path: 'hr/leaves/balances',
+                    name: 'hr-all-leave-balances',
+                    meta: { requiresAuth: true, roles: ['manager', 'admin'] },
+                    component: () => import('@/views/hr/AllEmployeesLeaveBalances.vue')
+                },
+                {
+                    path: 'hr/employees/:id/annual-leave-balance',
+                    name: 'hr-employee-leave-balance',
+                    meta: { requiresAuth: true, roles: ['manager', 'admin'] },
+                    component: () => import('@/views/hr/AnnualLeaveBalance.vue')
+                },
+                {
+                    path: 'hr/leaves/calendar',
+                    name: 'hr-leave-calendar',
+                    meta: { requiresAuth: true, roles: ['manager', 'admin'] },
+                    component: () => import('@/views/hr/LeaveCalendar.vue')
+                },
+                {
+                    path: 'hr/leaves/department-report',
+                    name: 'hr-department-report',
+                    meta: { requiresAuth: true, roles: ['manager', 'admin'] },
+                    component: () => import('@/views/hr/DepartmentLeaveReport.vue')
+                },
+                {
+                    path: 'hr/leaves/upcoming',
+                    name: 'hr-upcoming-leaves',
+                    meta: { requiresAuth: true, roles: ['manager', 'admin'] },
+                    component: () => import('@/views/hr/UpcomingLeaves.vue')
+                },
+                {
+                    path: 'hr/leaves/process-accruals',
+                    name: 'hr-process-accruals',
+                    meta: { requiresAuth: true, roles: ['admin'] },
+                    component: () => import('@/views/hr/ProcessAccruals.vue')
                 }
             ]
         }

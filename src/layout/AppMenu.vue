@@ -65,6 +65,41 @@ const allMenuItems = [
         ]
     },
     {
+        label: 'HR - Leave Management',
+        items: [
+            { 
+                label: 'All Leave Balances', 
+                icon: 'pi pi-fw pi-chart-line', 
+                to: '/app/hr/leaves/balances',
+                roles: ['manager', 'admin']
+            },
+            { 
+                label: 'Leave Calendar', 
+                icon: 'pi pi-fw pi-calendar', 
+                to: '/app/hr/leaves/calendar',
+                roles: ['manager', 'admin']
+            },
+            { 
+                label: 'Department Report', 
+                icon: 'pi pi-fw pi-building', 
+                to: '/app/hr/leaves/department-report',
+                roles: ['manager', 'admin']
+            },
+            { 
+                label: 'Upcoming Leaves', 
+                icon: 'pi pi-fw pi-clock', 
+                to: '/app/hr/leaves/upcoming',
+                roles: ['manager', 'admin']
+            },
+            { 
+                label: 'Process Accruals', 
+                icon: 'pi pi-fw pi-cog', 
+                to: '/app/hr/leaves/process-accruals',
+                roles: ['admin']
+            }
+        ]
+    },
+    {
         label: 'Administration',
         items: [
             { 

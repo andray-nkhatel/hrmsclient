@@ -427,6 +427,242 @@ export const employeeService = {
   }
 };
 
+// HR Leave Management Service (Manager/Admin only)
+export const hrLeaveService = {
+  // Get all employees' annual leave balances
+  async getAllEmployeesBalances(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.department) params.append('department', filters.department);
+    if (filters.status) params.append('status', filters.status);
+    const response = await apiClient.get(`/api/hr/employees/annual-leave-balances?${params.toString()}`);
+    return response.data;
+  },
+
+  // Get detailed annual leave balance for an employee
+  async getEmployeeBalance(employeeId) {
+    const response = await apiClient.get(`/api/hr/employees/${employeeId}/annual-leave-balance`);
+    return response.data;
+  },
+
+  // Adjust leave balance manually
+  async adjustBalance(employeeId, adjustment) {
+    const response = await apiClient.post(`/api/hr/employees/${employeeId}/annual-leave-balance/adjust`, adjustment);
+    return response.data;
+  },
+
+  // Add manual accrual
+  async addManualAccrual(employeeId, accrual) {
+    const response = await apiClient.post(`/api/hr/employees/${employeeId}/annual-leave-balance/accrual`, accrual);
+    return response.data;
+  },
+
+  // Get leave calendar
+  async getCalendar(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.start_date) params.append('start_date', filters.start_date);
+    if (filters.end_date) params.append('end_date', filters.end_date);
+    if (filters.department) params.append('department', filters.department);
+    const response = await apiClient.get(`/api/hr/leaves/calendar?${params.toString()}`);
+    return response.data;
+  },
+
+  // Get department leave report
+  async getDepartmentReport() {
+    const response = await apiClient.get('/api/hr/leaves/department-report');
+    return response.data;
+  },
+
+  // Get upcoming leaves
+  async getUpcoming(days = 30) {
+    const response = await apiClient.get(`/api/hr/leaves/upcoming?days=${days}`);
+    return response.data;
+  },
+
+  // Process monthly accruals
+  async processAccruals(month = null) {
+    const params = month ? `?month=${month}` : '';
+    const response = await apiClient.post(`/api/hr/leaves/process-accruals${params}`);
+    return response.data;
+  },
+
+  // Export annual leave balances to Excel or PDF
+  async exportBalances(format = 'excel', filters = {}) {
+    const params = new URLSearchParams();
+    params.append('format', format);
+    if (filters.department) params.append('department', filters.department);
+    if (filters.status) params.append('status', filters.status);
+    
+    const response = await apiClient.get(`/api/hr/employees/annual-leave-balances/export?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const extension = format === 'excel' ? 'xlsx' : 'pdf';
+    const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    link.setAttribute('download', `annual_leave_balances_${timestamp}.${extension}`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    
+    return response.data;
+  }
+};
+
+// Core HR Service (Manager/Admin only)
+export const coreHrService = {
+  // Identity Information
+  async getIdentity(employeeId) {
+    const response = await apiClient.get(`/api/employees/${employeeId}/identity`);
+    return response.data;
+  },
+
+  async updateIdentity(employeeId, identity) {
+    const response = await apiClient.post(`/api/employees/${employeeId}/identity`, identity);
+    return response.data;
+  },
+
+  // Employment Details
+  async getEmployment(employeeId) {
+    const response = await apiClient.get(`/api/employees/${employeeId}/employment`);
+    return response.data;
+  },
+
+  async updateEmployment(employeeId, employment) {
+    const response = await apiClient.post(`/api/employees/${employeeId}/employment`, employment);
+    return response.data;
+  },
+
+  async getEmploymentHistory(employeeId) {
+    const response = await apiClient.get(`/api/employees/${employeeId}/employment/history`);
+    return response.data;
+  },
+
+  // Positions
+  async getPositions() {
+    const response = await apiClient.get('/api/positions');
+    return response.data;
+  },
+
+  async getPosition(id) {
+    const response = await apiClient.get(`/api/positions/${id}`);
+    return response.data;
+  },
+
+  async createPosition(position) {
+    const response = await apiClient.post('/api/positions', position);
+    return response.data;
+  },
+
+  async updatePosition(id, position) {
+    const response = await apiClient.put(`/api/positions/${id}`, position);
+    return response.data;
+  },
+
+  async assignPosition(employeeId, assignment) {
+    const response = await apiClient.post(`/api/employees/${employeeId}/positions`, assignment);
+    return response.data;
+  },
+
+  // Documents
+  async getDocuments(employeeId) {
+    const response = await apiClient.get(`/api/employees/${employeeId}/documents`);
+    return response.data;
+  },
+
+  async uploadDocument(employeeId, formData) {
+    const response = await apiClient.post(`/api/employees/${employeeId}/documents`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  },
+
+  async downloadDocument(employeeId, documentId) {
+    const response = await apiClient.get(`/api/employees/${employeeId}/documents/${documentId}/download`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  },
+
+  async deleteDocument(employeeId, documentId) {
+    const response = await apiClient.delete(`/api/employees/${employeeId}/documents/${documentId}`);
+    return response.data;
+  },
+
+  // Work Lifecycle
+  async getLifecycleEvents(employeeId) {
+    const response = await apiClient.get(`/api/employees/${employeeId}/lifecycle`);
+    return response.data;
+  },
+
+  async createLifecycleEvent(employeeId, event) {
+    const response = await apiClient.post(`/api/employees/${employeeId}/lifecycle`, event);
+    return response.data;
+  },
+
+  // Onboarding
+  async getOnboarding(employeeId) {
+    const response = await apiClient.get(`/api/employees/${employeeId}/onboarding`);
+    return response.data;
+  },
+
+  async createOnboarding(employeeId, process) {
+    const response = await apiClient.post(`/api/employees/${employeeId}/onboarding`, process);
+    return response.data;
+  },
+
+  // Offboarding
+  async getOffboarding(employeeId) {
+    const response = await apiClient.get(`/api/employees/${employeeId}/offboarding`);
+    return response.data;
+  },
+
+  async createOffboarding(employeeId, process) {
+    const response = await apiClient.post(`/api/employees/${employeeId}/offboarding`, process);
+    return response.data;
+  },
+
+  // Compliance
+  async getComplianceRequirements() {
+    const response = await apiClient.get('/api/compliance/requirements');
+    return response.data;
+  },
+
+  async createComplianceRequirement(requirement) {
+    const response = await apiClient.post('/api/compliance/requirements', requirement);
+    return response.data;
+  },
+
+  async getComplianceRecords(employeeId) {
+    const response = await apiClient.get(`/api/employees/${employeeId}/compliance`);
+    return response.data;
+  },
+
+  async createComplianceRecord(employeeId, record) {
+    const response = await apiClient.post(`/api/employees/${employeeId}/compliance`, record);
+    return response.data;
+  },
+
+  // Audit Logs
+  async getAuditLogs(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.entity_type) params.append('entity_type', filters.entity_type);
+    if (filters.entity_id) params.append('entity_id', filters.entity_id);
+    if (filters.performed_by) params.append('performed_by', filters.performed_by);
+    const response = await apiClient.get(`/api/audit-logs?${params.toString()}`);
+    return response.data;
+  },
+
+  async getEmployeeAuditLogs(employeeId) {
+    const response = await apiClient.get(`/api/employees/${employeeId}/audit-logs`);
+    return response.data;
+  }
+};
+
 // Utility function to get current user
 export const getCurrentUser = () => {
   try {

@@ -79,3 +79,24 @@ export function formatTime(date) {
   });
 }
 
+/**
+ * Format a date string or Date object as YYYY-MM-DD (for API calls)
+ * @param {string|Date} date - The date to format
+ * @returns {string} Formatted date string (YYYY-MM-DD)
+ */
+export function formatDateForAPI(date) {
+  if (!date) return '';
+  
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  if (isNaN(dateObj.getTime())) {
+    return '';
+  }
+  
+  const year = dateObj.getFullYear();
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+}
+
