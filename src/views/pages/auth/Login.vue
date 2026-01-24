@@ -9,21 +9,16 @@ const store = useStore();
 const router = useRouter();
 const toast = useToast();
 
-const loginType = ref('employee'); // 'employee' or 'admin'
-const nrc = ref('');
 const username = ref('');
 const password = ref('');
 const loading = ref(false);
 
 const login = async () => {
-    const isAdmin = loginType.value === 'admin';
-    const identifier = isAdmin ? username.value : nrc.value;
-    
-    if (!identifier || !password.value) {
+    if (!username.value || !password.value) {
         toast.add({
             severity: 'error',
             summary: 'Error',
-            detail: isAdmin ? 'Please enter username and password' : 'Please enter NRC and password',
+            detail: 'Please enter username and password',
             closable: true,
             sticky: false
         });
@@ -35,15 +30,12 @@ const login = async () => {
     try {
         // Trim whitespace from inputs
         const trimmedUsername = username.value?.trim() || '';
-        const trimmedNrc = nrc.value?.trim() || '';
         const trimmedPassword = password.value?.trim() || '';
         
-        const credentials = isAdmin 
-            ? { username: trimmedUsername, password: trimmedPassword }
-            : { nrc: trimmedNrc, password: trimmedPassword };
+        const credentials = { username: trimmedUsername, password: trimmedPassword };
         
         if (import.meta.env.DEV) {
-            console.log('🔐 Attempting login:', { isAdmin, credentials: { ...credentials, password: '***' } });
+            console.log('🔐 Attempting login:', { credentials: { ...credentials, password: '***' } });
         }
             
         await store.dispatch('auth/login', credentials);
@@ -76,7 +68,7 @@ const login = async () => {
             });
         } else if (error.response && error.response.status === 401) {
             // 401 on login means invalid credentials
-            const errorMessage = error.response?.data?.error || 'Invalid credentials. Please check your username/NRC and password.';
+            const errorMessage = error.response?.data?.error || 'Invalid credentials. Please check your username and password.';
             toast.add({
                 severity: 'error',
                 summary: 'Login Failed',
@@ -126,27 +118,10 @@ const login = async () => {
                     <span class="text-muted-color font-medium">Sign in to continue</span>
                 </div>
                 
-                <!-- Login Type Toggle -->
-                <div class="flex justify-center mb-6">
-                    <SelectButton v-model="loginType" :options="[
-                        { label: 'Employee/Manager', value: 'employee' },
-                        { label: 'Admin', value: 'admin' }
-                    ]" optionLabel="label" optionValue="value" />
-                </div>
-                
                 <form @submit.prevent="login">
                     <div>
-                        <!-- NRC field for employees/managers -->
-                        <template v-if="loginType === 'employee'">
-                            <label for="nrc" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">NRC</label>
-                            <InputText id="nrc" type="text" placeholder="e.g. 123456/78/9" class="w-full mb-6" v-model="nrc" />
-                        </template>
-                        
-                        <!-- Username field for admins -->
-                        <template v-else>
-                            <label for="username" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">Username</label>
-                            <InputText id="username" type="text" placeholder="Username" class="w-full mb-6" v-model="username" />
-                        </template>
+                        <label for="username" class="block text-surface-900 dark:text-surface-0 text-xl font-medium mb-2">Username</label>
+                        <InputText id="username" type="text" placeholder="Username" class="w-full mb-6" v-model="username" />
                         
                         <label for="password" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Password</label>
                         <Password id="password" v-model="password" placeholder="Password" :toggleMask="true" class="w-full mb-8" fluid :feedback="false" @keyup.enter="login"></Password>
@@ -157,8 +132,6 @@ const login = async () => {
                         <div class="mt-6 p-4 bg-surface-100 dark:bg-surface-800 rounded-lg text-sm">
                             <div class="font-semibold mb-2 text-surface-700 dark:text-surface-300">Test Credentials:</div>
                             <div class="text-surface-600 dark:text-surface-400">
-                                <div><strong>Employee:</strong> NRC: 123456/78/9</div>
-                                <div><strong>Manager:</strong> NRC: 987654/32/1</div>
                                 <div><strong>Admin:</strong> Username: admin</div>
                                 <div class="mt-1"><strong>Password:</strong> password123</div>
                             </div>

@@ -119,6 +119,18 @@ const router = createRouter({
                     name: 'hr-process-accruals',
                     meta: { requiresAuth: true, roles: ['admin'] },
                     component: () => import('@/views/hr/ProcessAccruals.vue')
+                },
+                {
+                    path: 'hr/dashboard',
+                    name: 'hr-dashboard',
+                    meta: { requiresAuth: true, roles: ['manager', 'admin'] },
+                    component: () => import('@/views/hr/HRDashboard.vue')
+                },
+                {
+                    path: 'hr/leaves/manage',
+                    name: 'hr-leave-management',
+                    meta: { requiresAuth: true, roles: ['manager', 'admin'] },
+                    component: () => import('@/views/hr/LeaveManagement.vue')
                 }
             ]
         }

@@ -50,8 +50,10 @@ onMounted(() => {
                     <h3 class="text-lg font-semibold text-surface-900 dark:text-surface-0">
                         {{ item.leave_type_name }}
                     </h3>
-                    <Tag :value="`${item.balance} days left`" 
-                         :severity="item.balance > 5 ? 'success' : item.balance > 0 ? 'warn' : 'danger'" />
+                    <Tag 
+                        :value="item.balance < 0 ? `${Math.abs(item.balance)} days overdrawn` : `${item.balance} days left`" 
+                        :severity="item.balance < 0 ? 'danger' : item.balance > 5 ? 'success' : item.balance > 0 ? 'warn' : 'danger'" 
+                    />
                 </div>
                 
                 <div class="mb-2">
@@ -60,10 +62,20 @@ onMounted(() => {
                         <span>Max: {{ item.max_days }} days</span>
                     </div>
                     <div class="w-full bg-surface-200 dark:bg-surface-700 rounded-full h-2">
-                        <div :class="getProgressColor(item.balance, item.max_days)"
-                             class="h-2 rounded-full transition-all"
-                             :style="{ width: `${(item.balance / item.max_days) * 100}%` }">
+                        <div 
+                            v-if="item.balance >= 0"
+                            :class="getProgressColor(item.balance, item.max_days)"
+                            class="h-2 rounded-full transition-all"
+                            :style="{ width: `${Math.min((item.balance / item.max_days) * 100, 100)}%` }">
                         </div>
+                        <div 
+                            v-else
+                            class="h-2 rounded-full transition-all bg-red-500"
+                            :style="{ width: '100%' }">
+                        </div>
+                    </div>
+                    <div v-if="item.balance < 0" class="text-xs text-red-500 mt-1">
+                        Balance is overdrawn by {{ Math.abs(item.balance) }} days
                     </div>
                 </div>
             </div>

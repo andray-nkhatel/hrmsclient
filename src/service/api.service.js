@@ -287,6 +287,15 @@ export const authService = {
     return response.data;
   },
 
+  async changePassword(passwordData) {
+    const user = getCurrentUser();
+    if (!user || !user.id) {
+      throw new Error('User not authenticated');
+    }
+    const response = await apiClient.put(`/api/employees/${user.id}/password`, passwordData);
+    return response.data;
+  },
+
   logout() {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -344,6 +353,12 @@ export const leaveService = {
   // Get leave audit trail (manager/admin)
   async getAudit(id) {
     const response = await apiClient.get(`/api/leaves/${id}/audit`);
+    return response.data;
+  },
+
+  // Get leave types
+  async getLeaveTypes() {
+    const response = await apiClient.get('/api/leave-types');
     return response.data;
   }
 };
@@ -416,6 +431,52 @@ export const employeeService = {
     window.URL.revokeObjectURL(url);
   },
 
+  // Export all employees to PDF
+  async exportAll() {
+    const response = await apiClient.get('/api/employees/export', {
+      responseType: 'blob'
+    });
+    const contentDisposition = response.headers['content-disposition'];
+    let filename = 'employees.pdf';
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  // Export single employee to PDF
+  async exportEmployee(id) {
+    const response = await apiClient.get(`/api/employees/${id}/export`, {
+      responseType: 'blob'
+    });
+    const contentDisposition = response.headers['content-disposition'];
+    let filename = `employee_${id}.pdf`;
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
   // Bulk upload employees from CSV
   async bulkUpload(file) {
     const formData = new FormData();
@@ -450,9 +511,41 @@ export const hrLeaveService = {
     return response.data;
   },
 
+  // Set initial balance (for onboarding)
+  async setInitialBalance(employeeId, data) {
+    const response = await apiClient.post(`/api/hr/employees/${employeeId}/annual-leave-balance/set-initial`, data);
+    return response.data;
+  },
+
+  // Bulk import leave balances from CSV
+  async bulkImportLeaveBalances(file, month, resetAll) {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (month) {
+      formData.append('month', month);
+    }
+    if (resetAll) {
+      formData.append('reset_all', 'true');
+    }
+    const response = await apiClient.post('/api/hr/leave-balances/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   // Add manual accrual
   async addManualAccrual(employeeId, accrual) {
     const response = await apiClient.post(`/api/hr/employees/${employeeId}/annual-leave-balance/accrual`, accrual);
+    return response.data;
+  },
+
+  // Bulk add manual accruals
+  async bulkAddManualAccruals(employeeId, accruals) {
+    const response = await apiClient.post(`/api/hr/employees/${employeeId}/annual-leave-balance/accruals/bulk`, {
+      accruals: accruals
+    });
     return response.data;
   },
 
@@ -478,10 +571,52 @@ export const hrLeaveService = {
     return response.data;
   },
 
+  // Create leave for employee (admin) - file upload is REQUIRED
+  async createLeave(leaveData, leaveFormFile) {
+    if (!leaveFormFile) {
+      throw new Error('Leave form attachment is required');
+    }
+    
+    // Always use FormData for multipart/form-data (file is required)
+    const formData = new FormData();
+    formData.append('employee_id', leaveData.employee_id);
+    formData.append('leave_type_id', leaveData.leave_type_id);
+    formData.append('start_date', leaveData.start_date);
+    formData.append('end_date', leaveData.end_date);
+    if (leaveData.reason) {
+      formData.append('reason', leaveData.reason);
+    }
+    if (leaveData.status) {
+      formData.append('status', leaveData.status);
+    }
+    formData.append('leave_form', leaveFormFile);
+    
+    const response = await apiClient.post('/api/hr/leaves', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
   // Process monthly accruals
-  async processAccruals(month = null) {
-    const params = month ? `?month=${month}` : '';
-    const response = await apiClient.post(`/api/hr/leaves/process-accruals${params}`);
+  async processAccruals(month = null, employeeIds = null) {
+    const requestBody = {};
+    if (month) {
+      requestBody.month = month;
+    }
+    if (employeeIds && employeeIds.length > 0) {
+      requestBody.employee_ids = employeeIds;
+    }
+    
+    // If no body data, use query parameter for backward compatibility
+    if (Object.keys(requestBody).length === 0) {
+      const params = month ? `?month=${month}` : '';
+      const response = await apiClient.post(`/api/hr/leaves/process-accruals${params}`);
+      return response.data;
+    }
+    
+    const response = await apiClient.post('/api/hr/leaves/process-accruals', requestBody);
     return response.data;
   },
 
@@ -504,6 +639,93 @@ export const hrLeaveService = {
     const extension = format === 'excel' ? 'xlsx' : 'pdf';
     const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     link.setAttribute('download', `annual_leave_balances_${timestamp}.${extension}`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    
+    return response.data;
+  },
+
+  // Export single employee annual leave report to Excel or PDF
+  async exportEmployeeBalance(employeeId, format = 'excel') {
+    const params = new URLSearchParams();
+    params.append('format', format);
+    
+    const response = await apiClient.get(`/api/hr/employees/${employeeId}/annual-leave-balance/export?${params.toString()}`, {
+      responseType: 'blob'
+    });
+    
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    
+    const extension = format === 'excel' ? 'xlsx' : 'pdf';
+    link.setAttribute('download', `annual_leave_report_${employeeId}.${extension}`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+    
+    return response.data;
+  },
+
+  // Bulk create leaves from CSV
+  async bulkCreateLeaves(file, skipInvalidRows = false) {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (skipInvalidRows) {
+      formData.append('skip_invalid_rows', 'true');
+    }
+    const response = await apiClient.post('/api/hr/leaves/bulk-import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
+
+  // Bulk create leaves from template (same leave for multiple employees)
+  async bulkCreateLeavesFromTemplate(template) {
+    const response = await apiClient.post('/api/hr/leaves/bulk-template', template);
+    return response.data;
+  },
+
+  // Get employee leaves
+  async getEmployeeLeaves(employeeId, filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.status) params.append('status', filters.status);
+    if (filters.start_date) params.append('start_date', filters.start_date);
+    if (filters.end_date) params.append('end_date', filters.end_date);
+    if (filters.leave_type_id) params.append('leave_type_id', filters.leave_type_id);
+    const response = await apiClient.get(`/api/hr/employees/${employeeId}/leaves?${params.toString()}`);
+    return response.data;
+  },
+
+  // Download leave form attachment
+  async downloadLeaveForm(leaveId) {
+    const response = await apiClient.get(`/api/hr/leaves/${leaveId}/form`, {
+      responseType: 'blob',
+    });
+    
+    // Create blob URL and trigger download
+    const blob = new Blob([response.data]);
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    
+    // Try to get filename from Content-Disposition header
+    const contentDisposition = response.headers['content-disposition'];
+    let filename = 'leave_form';
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (filenameMatch && filenameMatch[1]) {
+        filename = filenameMatch[1].replace(/['"]/g, '');
+      }
+    }
+    
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     link.remove();

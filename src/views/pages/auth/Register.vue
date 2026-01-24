@@ -13,6 +13,7 @@ const userName = ref('');
 const email = ref('');
 const password = ref('');
 const confirmPassword = ref('');
+const hireDate = ref(null);
 const role = 'Official'; // Hard-coded role as 'Official'
 const loading = ref(false);
 
@@ -65,6 +66,16 @@ const register = async () => {
       password: password.value,
       role: role // Use the hard-coded role value
     };
+    
+    // Add hire_date if provided
+    if (hireDate.value) {
+      // Format date as YYYY-MM-DD
+      const date = new Date(hireDate.value);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      registrationData.hire_date = `${year}-${month}-${day}`;
+    }
     
     // Call the register action in the auth store
     await store.dispatch('auth/register', registrationData);
@@ -140,6 +151,10 @@ const loginNavigation = () => {
             <!-- Confirm Password field -->
             <label for="confirmPassword" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Confirm Password</label>
             <Password id="confirmPassword" v-model="confirmPassword" placeholder="Confirm password" :toggleMask="true" class="mb-6" fluid :feedback="false"></Password>
+            
+            <!-- Hire Date field (optional) -->
+            <label for="hireDate" class="block text-surface-900 dark:text-surface-0 font-medium text-xl mb-2">Hire Date (Optional)</label>
+            <Calendar id="hireDate" v-model="hireDate" dateFormat="yy-mm-dd" showIcon class="w-full md:w-[30rem] mb-6" placeholder="Select hire date" />
             
             <!-- Role information (display only) -->
             <div class="text-surface-700 dark:text-surface-300 mb-8">

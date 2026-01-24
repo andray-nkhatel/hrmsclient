@@ -4,6 +4,6 @@
     <div class="layout-footer">
         HRMS by CHS I.T. Dept
         <!-- <a href="https://chudleighhouseschool.com" target="_blank" rel="noopener noreferrer" class="text-primary font-bold hover:underline">QUANTUMLOGIX SYSTEMS</a> -->
-        &copy; 2025
+        &copy; 2026
     </div>
 </template>

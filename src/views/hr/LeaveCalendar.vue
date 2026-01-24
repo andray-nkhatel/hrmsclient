@@ -2,7 +2,20 @@
   <div class="card">
     <div class="flex justify-content-between align-items-center mb-4">
       <h2 class="text-2xl font-semibold m-0">Leave Calendar</h2>
-      <div class="flex gap-2">
+      <div class="flex ml-auto gap-2">
+        <Button 
+          label="Quick Entry" 
+          icon="pi pi-plus" 
+          @click="showQuickEntry = true"
+          severity="success"
+        />
+        <Button 
+          label="Bulk Import" 
+          icon="pi pi-upload" 
+          @click="showBulkImport = true"
+          severity="info"
+          outlined
+        />
         <Calendar 
           v-model="dateRange" 
           selectionMode="range" 
@@ -42,10 +55,10 @@
         :globalFilterFields="['employee_name', 'department', 'leave_type']"
       >
         <template #header>
-          <div class="flex justify-content-between">
+          <div class="flex">
             <span class="p-input-icon-left w-full">
-              <i class="pi pi-search" />
-              <InputText v-model="filters.global.value" placeholder="Search..." class="w-full" />
+              <i class="pi pi-search mr-3" />
+              <InputText v-model="filters.global.value" placeholder="Search..." class="w-half" />
             </span>
           </div>
         </template>
@@ -68,6 +81,18 @@
         </Column>
       </DataTable>
     </div>
+
+    <!-- Quick Leave Entry Dialog -->
+    <QuickLeaveEntry 
+      v-model="showQuickEntry" 
+      @created="loadCalendar"
+    />
+
+    <!-- Bulk Import Dialog -->
+    <BulkLeaveImport 
+      v-model="showBulkImport" 
+      @imported="loadCalendar"
+    />
   </div>
 </template>
 
@@ -77,11 +102,15 @@ import { onMounted, ref } from 'vue';
 // FilterMatchMode is auto-imported by PrimeVue
 import { hrLeaveService } from '@/service/api.service';
 import { formatDate, formatDateForAPI } from '@/service/dateUtils';
+import BulkLeaveImport from './BulkLeaveImport.vue';
+import QuickLeaveEntry from './QuickLeaveEntry.vue';
 
 const toast = useToast();
 const loading = ref(false);
 const calendar = ref([]);
 const dateRange = ref(null);
+const showQuickEntry = ref(false);
+const showBulkImport = ref(false);
 
 const departmentFilter = ref(null);
 const filters = ref({

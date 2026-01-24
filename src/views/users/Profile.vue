@@ -1,74 +1,68 @@
 <script setup>
 import { useToast } from 'primevue/usetoast';
 import { computed, onMounted, ref } from 'vue';
-import { authService } from '../../service/api.service';
-import { formatDate as formatDateUtil, formatDateTime as formatDateTimeUtil } from '@/service/dateUtils';
+import { useStore } from 'vuex';
+import { authService, employeeService } from '@/service/api.service';
+import { formatDate as formatDateUtil } from '@/service/dateUtils';
 
-// Utilities
 const toast = useToast();
+const store = useStore();
 
-// Reactive data
 const loading = ref(false);
+const saving = ref(false);
+const showPasswordDialog = ref(false);
+const editMode = ref(false);
+
 const profileData = ref({
   id: null,
-  username: '',
-  fullName: '',
+  username: null,
+  nrc: null,
+  firstname: '',
+  lastname: '',
   email: '',
+  department: '',
   role: '',
-  isActive: true,
-  createdAt: '',
-  lastLoginAt: ''
+  created_at: null
+});
+
+const passwordForm = ref({
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+});
+
+const originalData = ref({});
+
+const fullName = computed(() => {
+  return `${profileData.value.firstname} ${profileData.value.lastname}`.trim() || 'User';
 });
 
 const formattedCreatedAt = computed(() => {
-  if (!profileData.value.createdAt) return 'N/A';
-  return formatDateUtil(profileData.value.createdAt, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+  if (!profileData.value.created_at) return 'N/A';
+  return formatDateUtil(profileData.value.created_at);
 });
 
-const formattedLastLogin = computed(() => {
-  if (!profileData.value.lastLoginAt) return 'Never';
-  return formatDateTimeUtil(profileData.value.lastLoginAt, {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-});
-
-const roleIcon = computed(() => {
-  switch (profileData.value.role) {
-    case 'Admin': return 'pi-crown';
-    case 'Teacher': return 'pi-graduation-cap';
-    case 'Staff': return 'pi-users';
-    default: return 'pi-user';
-  }
-});
-
-const roleColor = computed(() => {
-  switch (profileData.value.role) {
-    case 'Admin': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-    case 'Teacher': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-    case 'Staff': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-    default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-  }
-});
-
-// Methods
 const loadProfile = async () => {
   loading.value = true;
   try {
     const data = await authService.getProfile();
-    profileData.value = data;
+    profileData.value = {
+      id: data.id,
+      username: data.username,
+      nrc: data.nrc,
+      firstname: data.firstname || '',
+      lastname: data.lastname || '',
+      email: data.email || '',
+      department: data.department || '',
+      role: data.role || '',
+      created_at: data.created_at
+    };
+    originalData.value = { ...profileData.value };
   } catch (error) {
     toast.add({
       severity: 'error',
       summary: 'Error',
-      detail: 'Failed to load profile data',
+      detail: error.userMessage || 'Failed to load profile data',
       life: 3000
     });
   } finally {
@@ -76,158 +70,315 @@ const loadProfile = async () => {
   }
 };
 
-const refreshProfile = async () => {
-  await loadProfile();
-  toast.add({
-    severity: 'info',
-    summary: 'Refreshed',
-    detail: 'Profile data refreshed',
-    life: 2000
-  });
+const enableEdit = () => {
+  editMode.value = true;
 };
 
-const profileTableRows = computed(() => [
-  { label: 'Full Name', value: profileData.value.fullName || 'Not provided' },
-  { label: 'Username', value: profileData.value.username },
-  { label: 'Email Address', value: profileData.value.email || 'Not provided' },
-  { label: 'Role', value: profileData.value.role },
-  { label: 'Account Created', value: formattedCreatedAt.value },
-  { label: 'Last Login', value: formattedLastLogin.value }
-]);
+const cancelEdit = () => {
+  profileData.value = { ...originalData.value };
+  editMode.value = false;
+};
 
-// Lifecycle
+const saveProfile = async () => {
+  if (!profileData.value.firstname || !profileData.value.lastname || !profileData.value.email) {
+    toast.add({
+      severity: 'error',
+      summary: 'Validation Error',
+      detail: 'Please fill in all required fields',
+      life: 3000
+    });
+    return;
+  }
+
+  saving.value = true;
+  try {
+    const updateData = {
+      firstname: profileData.value.firstname,
+      lastname: profileData.value.lastname,
+      email: profileData.value.email,
+      department: profileData.value.department
+    };
+    
+    await employeeService.update(profileData.value.id, updateData);
+    
+    // Update store with new data
+    const currentUser = store.getters['auth/user'];
+    if (currentUser) {
+      store.commit('auth/SET_USER', {
+        ...currentUser,
+        firstname: profileData.value.firstname,
+        lastname: profileData.value.lastname,
+        email: profileData.value.email,
+        department: profileData.value.department
+      });
+    }
+    
+    originalData.value = { ...profileData.value };
+    editMode.value = false;
+    
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Profile updated successfully',
+      life: 3000
+    });
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.userMessage || 'Failed to update profile',
+      life: 3000
+    });
+  } finally {
+    saving.value = false;
+  }
+};
+
+const openPasswordDialog = () => {
+  passwordForm.value = {
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  };
+  showPasswordDialog.value = true;
+};
+
+const changePassword = async () => {
+  if (!passwordForm.value.currentPassword || !passwordForm.value.newPassword || !passwordForm.value.confirmPassword) {
+    toast.add({
+      severity: 'error',
+      summary: 'Validation Error',
+      detail: 'Please fill in all password fields',
+      life: 3000
+    });
+    return;
+  }
+
+  if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
+    toast.add({
+      severity: 'error',
+      summary: 'Validation Error',
+      detail: 'New password and confirm password do not match',
+      life: 3000
+    });
+    return;
+  }
+
+  if (passwordForm.value.newPassword.length < 6) {
+    toast.add({
+      severity: 'error',
+      summary: 'Validation Error',
+      detail: 'Password must be at least 6 characters long',
+      life: 3000
+    });
+    return;
+  }
+
+  saving.value = true;
+  try {
+    // Note: This assumes there's a password change endpoint
+    // If not, we'll need to create one in the backend
+    await authService.changePassword({
+      currentPassword: passwordForm.value.currentPassword,
+      newPassword: passwordForm.value.newPassword
+    });
+    
+    passwordForm.value = {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    };
+    showPasswordDialog.value = false;
+    
+    toast.add({
+      severity: 'success',
+      summary: 'Success',
+      detail: 'Password changed successfully',
+      life: 3000
+    });
+  } catch (error) {
+    toast.add({
+      severity: 'error',
+      summary: 'Error',
+      detail: error.userMessage || 'Failed to change password',
+      life: 3000
+    });
+  } finally {
+    saving.value = false;
+  }
+};
+
 onMounted(() => {
   loadProfile();
 });
 </script>
 
 <template>
-  <div class="relative">
-    <!-- Loading Overlay -->
-    <div v-if="loading && !profileData.id" class="absolute inset-0 z-50 flex items-center justify-center bg-black bg-opacity-30">
-      <ProgressSpinner style="width: 60px; height: 60px" strokeWidth="4" />
-    </div>
-
-    <!-- Profile Header -->
-    <div class="flex flex-col items-center justify-center gap-3 py-8 mb-6 bg-slate-50 dark:bg-slate-800 rounded-xl shadow-md w-full px-4 text-gray-900 dark:text-gray-100">
-      <Avatar
-        :label="profileData.fullName?.charAt(0) || 'U'"
-        size="xxlarge"
-        class="text-white font-bold shadow-lg border-4 border-white mb-2"
-        :style="{ backgroundColor: profileData.role === 'Admin' ? '#ef4444' : profileData.role === 'Teacher' ? '#3b82f6' : '#10b981' }"
-      />
-      <div class="flex flex-col sm:flex-row items-center gap-2 mt-2 w-full justify-center text-center">
-        <h2 class="text-2xl sm:text-3xl font-bold text-900 dark:text-gray-100 m-0">{{ profileData.fullName }}</h2>
-        <Tag :class="roleColor" :icon="`pi ${roleIcon}`" class="ml-0 sm:ml-2 mt-1 sm:mt-0">{{ profileData.role }}</Tag>
-        <Tag :severity="profileData.isActive ? 'success' : 'danger'" :value="profileData.isActive ? 'Active' : 'Inactive'" class="ml-0 sm:ml-2 mt-1 sm:mt-0" />
+  <div class="card">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-semibold m-0">Profile</h2>
+      <div class="flex gap-2" v-if="!editMode">
+        <Button 
+          label="Edit Profile" 
+          icon="pi pi-pencil" 
+          @click="enableEdit"
+          :disabled="loading"
+        />
+        <Button 
+          label="Change Password" 
+          icon="pi pi-key" 
+          severity="secondary"
+          outlined
+          @click="openPasswordDialog"
+          :disabled="loading"
+        />
       </div>
-      <p class="text-600 dark:text-gray-300 mt-1 mb-0 text-sm sm:text-base">View your account information</p>
-      <Button 
-        icon="pi pi-refresh" 
-        outlined 
-        @click="refreshProfile"
-        :loading="loading"
-        v-tooltip.top="'Refresh Profile'"
-        class="mt-2 w-full sm:w-auto"
-      />
+      <div class="flex gap-2" v-else>
+        <Button 
+          label="Cancel" 
+          icon="pi pi-times" 
+          severity="secondary"
+          outlined
+          @click="cancelEdit"
+          :disabled="saving"
+        />
+        <Button 
+          label="Save" 
+          icon="pi pi-check" 
+          @click="saveProfile"
+          :loading="saving"
+        />
+      </div>
     </div>
 
-    <!-- Main Content Grid -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <!-- Profile Details Card -->
-      <Panel class="shadow-md bg-slate-50 dark:bg-slate-800 text-gray-900 dark:text-gray-100">
-        <template #header>
-          <div class="flex items-center gap-2">
-            <i class="pi pi-user text-primary"></i>
-            <span class="font-semibold">Personal Details</span>
+    <div v-if="loading && !profileData.id" class="flex justify-center p-8">
+      <ProgressSpinner />
+    </div>
+
+    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <!-- Profile Information -->
+      <Panel header="Personal Information">
+        <div class="grid grid-cols-1 gap-4">
+          <div>
+            <label class="block font-medium mb-2">First Name *</label>
+            <InputText 
+              v-model="profileData.firstname" 
+              class="w-full"
+              :disabled="!editMode"
+            />
           </div>
-        </template>
-        <div class="p-2">
-          <DataTable :value="profileTableRows" class="p-datatable-sm w-full text-gray-900 dark:text-gray-100">
-            <Column field="label" header="Field" style="width: 40%">
-              <template #body="{ data }">
-                <span class="flex items-center gap-2">
-                  <i v-if="data.label === 'Full Name'" class="pi pi-id-card text-blue-400"></i>
-                  <i v-else-if="data.label === 'Username'" class="pi pi-user text-green-400"></i>
-                  <i v-else-if="data.label === 'Email Address'" class="pi pi-envelope text-purple-400"></i>
-                  <i v-else-if="data.label === 'Role'" class="pi pi-shield text-orange-400"></i>
-                  <i v-else-if="data.label === 'Account Created'" class="pi pi-calendar-plus text-cyan-400"></i>
-                  <i v-else-if="data.label === 'Last Login'" class="pi pi-clock text-pink-400"></i>
-                  {{ data.label }}
-                </span>
-              </template>
-            </Column>
-            <Column field="value" header="Value"></Column>
-          </DataTable>
+          <div>
+            <label class="block font-medium mb-2">Last Name *</label>
+            <InputText 
+              v-model="profileData.lastname" 
+              class="w-full"
+              :disabled="!editMode"
+            />
+          </div>
+          <div>
+            <label class="block font-medium mb-2">Email *</label>
+            <InputText 
+              v-model="profileData.email" 
+              type="email"
+              class="w-full"
+              :disabled="!editMode"
+            />
+          </div>
+          <div>
+            <label class="block font-medium mb-2">Department</label>
+            <InputText 
+              v-model="profileData.department" 
+              class="w-full"
+              :disabled="!editMode"
+            />
+          </div>
         </div>
       </Panel>
 
-      <!-- Quick Stats Card -->
-      <Panel class="shadow-md bg-slate-50 dark:bg-slate-800 text-gray-900 dark:text-gray-100">
-        <template #header>
-          <div class="flex items-center gap-2">
-            <i class="pi pi-info-circle text-primary"></i>
-            <span class="font-semibold">Account Information</span>
+      <!-- Account Information -->
+      <Panel header="Account Information">
+        <div class="grid grid-cols-1 gap-4">
+          <div>
+            <label class="block font-medium mb-2">Username / NRC</label>
+            <InputText 
+              :value="profileData.username || profileData.nrc || '-'" 
+              class="w-full"
+              disabled
+            />
           </div>
-        </template>
-        <div class="flex flex-col gap-4 p-2">
-          <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 transition">
-            <div class="flex items-center gap-2">
-              <i class="pi pi-id-card text-primary"></i>
-              <span class="font-medium">User ID</span>
-            </div>
-            <span class="font-bold">#{{ profileData.id }}</span>
+          <div>
+            <label class="block font-medium mb-2">Role</label>
+            <InputText 
+              :value="profileData.role" 
+              class="w-full"
+              disabled
+            />
           </div>
-          <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 transition">
-            <div class="flex items-center gap-2">
-              <i class="pi pi-shield text-primary"></i>
-              <span class="font-medium">Account Status</span>
-            </div>
-            <Tag :severity="profileData.isActive ? 'success' : 'danger'" :value="profileData.isActive ? 'Active' : 'Inactive'" />
-          </div>
-          <div class="flex items-center justify-between p-3 rounded-lg bg-slate-50 hover:bg-slate-100 dark:bg-slate-800 dark:hover:bg-slate-700 transition">
-            <div class="flex items-center gap-2">
-              <i :class="`pi ${roleIcon} text-primary`"></i>
-              <span class="font-medium">Access Level</span>
-            </div>
-            <span class="font-bold">{{ profileData.role }}</span>
+          <div>
+            <label class="block font-medium mb-2">Account Created</label>
+            <InputText 
+              :value="formattedCreatedAt" 
+              class="w-full"
+              disabled
+            />
           </div>
         </div>
       </Panel>
     </div>
 
-    <!-- Session Information Card -->
-    <Panel class="mt-6 shadow-md bg-slate-50 dark:bg-slate-800 text-gray-900 dark:text-gray-100">
-      <template #header>
-        <div class="flex items-center gap-2">
-          <i class="pi pi-clock text-primary"></i>
-          <span class="font-semibold">Session Information</span>
+    <!-- Change Password Dialog -->
+    <Dialog 
+      v-model:visible="showPasswordDialog" 
+      header="Change Password" 
+      modal 
+      style="width: 450px"
+    >
+      <div class="grid grid-cols-1 gap-4">
+        <div>
+          <label class="block font-medium mb-2">Current Password *</label>
+          <Password 
+            v-model="passwordForm.currentPassword" 
+            class="w-full"
+            :feedback="false"
+            toggleMask
+            placeholder="Enter current password"
+          />
         </div>
+        <div>
+          <label class="block font-medium mb-2">New Password *</label>
+          <Password 
+            v-model="passwordForm.newPassword" 
+            class="w-full"
+            :feedback="true"
+            toggleMask
+            placeholder="Enter new password"
+          />
+        </div>
+        <div>
+          <label class="block font-medium mb-2">Confirm New Password *</label>
+          <Password 
+            v-model="passwordForm.confirmPassword" 
+            class="w-full"
+            :feedback="false"
+            toggleMask
+            placeholder="Confirm new password"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <Button 
+          label="Cancel" 
+          severity="secondary" 
+          outlined 
+          @click="showPasswordDialog = false"
+          :disabled="saving"
+        />
+        <Button 
+          label="Change Password" 
+          @click="changePassword"
+          :loading="saving"
+        />
       </template>
-      <div class="flex flex-col md:flex-row gap-6 p-4 items-center justify-center">
-        <div class="flex-1 text-center">
-          <i class="pi pi-clock text-primary text-3xl mb-2"></i>
-          <p class="text-600 dark:text-gray-300 text-sm m-0">Last Login</p>
-          <p class="font-bold text-900 dark:text-gray-100 mt-1">{{ formattedLastLogin }}</p>
-        </div>
-        <Divider layout="vertical" class="hidden md:block" />
-        <div class="flex-1 text-center">
-          <i class="pi pi-calendar text-primary text-3xl mb-2"></i>
-          <p class="text-600 dark:text-gray-300 text-sm m-0">Member Since</p>
-          <p class="font-bold text-900 dark:text-gray-100 mt-1">{{ formattedCreatedAt }}</p>
-        </div>
-      </div>
-    </Panel>
+    </Dialog>
   </div>
 </template>
-
-<style scoped>
-.field {
-  margin-bottom: 1rem;
-}
-
-.field label {
-  display: block;
-  margin-bottom: 0.25rem;
-}
-</style>

@@ -1,9 +1,9 @@
 <script setup>
+import { leaveService } from '@/service/api.service';
 import { computed, onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import AppMenuItem from './AppMenuItem.vue';
-import { leaveService } from '@/service/api.service';
 
 const store = useStore();
 const router = useRouter();
@@ -33,50 +33,50 @@ const allMenuItems = [
             }
         ]
     },
-    {
-        label: 'Leave Management',
-        items: [
-            { 
-                label: 'My Leaves', 
-                icon: 'pi pi-fw pi-calendar', 
-                to: '/app/leaves',
-                roles: ['admin', 'manager', 'employee']
-            },
-            { 
-                label: 'Apply for Leave', 
-                icon: 'pi pi-fw pi-plus-circle', 
-                to: '/app/leaves/apply',
-                roles: ['admin', 'manager', 'employee']
-            },
-            { 
-                label: 'Leave Balance', 
-                icon: 'pi pi-fw pi-chart-bar', 
-                to: '/app/leaves/balance',
-                roles: ['admin', 'manager', 'employee']
-            },
-            { 
-                label: 'Pending Approvals', 
-                icon: 'pi pi-fw pi-clock', 
-                to: '/app/leaves/pending',
-                roles: ['admin', 'manager'],
-                badge: () => pendingCount.value > 0 ? pendingCount.value : null,
-                badgeClass: 'p-badge-danger'
-            }
-        ]
-    },
+    // {
+    //     label: 'Leave Management',
+    //     items: [
+    //         { 
+    //             label: 'My Leaves', 
+    //             icon: 'pi pi-fw pi-calendar', 
+    //             to: '/app/leaves',
+    //             roles: ['admin', 'manager', 'employee']
+    //         },
+    //         { 
+    //             label: 'Apply for Leave', 
+    //             icon: 'pi pi-fw pi-plus-circle', 
+    //             to: '/app/leaves/apply',
+    //             roles: ['admin', 'manager', 'employee']
+    //         },
+    //         { 
+    //             label: 'Leave Balance', 
+    //             icon: 'pi pi-fw pi-chart-bar', 
+    //             to: '/app/leaves/balance',
+    //             roles: ['admin', 'manager', 'employee']
+    //         },
+    //         { 
+    //             label: 'Pending Approvals', 
+    //             icon: 'pi pi-fw pi-clock', 
+    //             to: '/app/leaves/pending',
+    //             roles: ['admin', 'manager'],
+    //             badge: () => pendingCount.value > 0 ? pendingCount.value : null,
+    //             badgeClass: 'p-badge-danger'
+    //         }
+    //     ]
+    // },
     {
         label: 'HR - Leave Management',
         items: [
             { 
-                label: 'All Leave Balances', 
+                label: 'Annual Leave', 
                 icon: 'pi pi-fw pi-chart-line', 
                 to: '/app/hr/leaves/balances',
                 roles: ['manager', 'admin']
             },
             { 
-                label: 'Leave Calendar', 
-                icon: 'pi pi-fw pi-calendar', 
-                to: '/app/hr/leaves/calendar',
+                label: 'Leave Records', 
+                icon: 'pi pi-fw pi-calendar-plus', 
+                to: '/app/hr/leaves/manage',
                 roles: ['manager', 'admin']
             },
             { 
@@ -85,18 +85,18 @@ const allMenuItems = [
                 to: '/app/hr/leaves/department-report',
                 roles: ['manager', 'admin']
             },
-            { 
+            /*{ 
                 label: 'Upcoming Leaves', 
                 icon: 'pi pi-fw pi-clock', 
                 to: '/app/hr/leaves/upcoming',
                 roles: ['manager', 'admin']
-            },
+            
             { 
                 label: 'Process Accruals', 
                 icon: 'pi pi-fw pi-cog', 
                 to: '/app/hr/leaves/process-accruals',
                 roles: ['admin']
-            }
+            }*/
         ]
     },
     {
@@ -166,13 +166,20 @@ const model = computed(() => {
     })
     .filter(section => section !== null);
 
-  // Add logout item for all authenticated users
+  // Add profile and logout items for all authenticated users
   filteredMenuItems.push({
-    items: [{ 
-      label: 'Logout', 
-      icon: 'pi pi-fw pi-sign-out', 
-      command: logout
-    }]
+    items: [
+      { 
+        label: 'Profile', 
+        icon: 'pi pi-fw pi-user-edit', 
+        to: '/app/profile'
+      },
+      { 
+        label: 'Logout', 
+        icon: 'pi pi-fw pi-sign-out', 
+        command: logout
+      }
+    ]
   });
 
   return filteredMenuItems;

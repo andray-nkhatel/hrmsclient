@@ -1,26 +1,82 @@
 <script setup>
 import { employeeService } from '@/service/api.service';
+import { formatDate } from '@/service/dateUtils';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import Button from 'primevue/button';
+import Calendar from 'primevue/calendar';
+import DataTable from 'primevue/datatable';
+import Column from 'primevue/column';
+import Dialog from 'primevue/dialog';
+import FileUpload from 'primevue/fileupload';
+import InputText from 'primevue/inputtext';
+import ProgressSpinner from 'primevue/progressspinner';
+import Select from 'primevue/select';
+import Tag from 'primevue/tag';
+import Textarea from 'primevue/textarea';
 
 const router = useRouter();
 
 const toast = useToast();
 const employees = ref([]);
+const filteredEmployees = ref([]);
 const loading = ref(true);
 const dialogVisible = ref(false);
 const uploadDialogVisible = ref(false);
+const viewDialogVisible = ref(false);
 const editMode = ref(false);
 const submitting = ref(false);
 const uploading = ref(false);
 const isAdmin = ref(false);
 const uploadResult = ref(null);
 const fileInput = ref(null);
+const searchTerm = ref('');
+const viewingEmployee = ref(null);
 
 const roles = [
     { label: 'Employee', value: 'employee' },
     { label: 'Manager', value: 'manager' }
+];
+
+const departments = [
+    'Accounts',
+    'Administration',
+    'Admissions',
+    'Canteen',
+    'Cleaning Services',
+    'Finance',
+    'Health & Safety',
+    'Human Resources',
+    'I.T.',
+    'Library',
+    'Maintenance',
+    'Marketing',
+    'Procurement',
+    'Registrar',
+    'Security',
+    'Student Services',
+    'Transport'
+];
+
+const genders = ['Male', 'Female', 'Other', 'Prefer not to say'];
+
+const employmentStatuses = [
+    { label: 'Active', value: 'active' },
+    { label: 'Inactive', value: 'inactive' },
+    { label: 'On Leave', value: 'on_leave' },
+    { label: 'Terminated', value: 'terminated' },
+    { label: 'Resigned', value: 'resigned' }
+];
+
+const emergencyContactRelationships = [
+    'Spouse',
+    'Parent',
+    'Sibling',
+    'Child',
+    'Relative',
+    'Friend',
+    'Other'
 ];
 
 const form = ref({
@@ -32,13 +88,32 @@ const form = ref({
     email: '',
     password: '',
     department: '',
-    role: 'employee'
+    role: 'employee',
+    hire_date: null,
+    // Additional employee fields
+    phone: '',
+    mobile: '',
+    address: '',
+    city: '',
+    postal_code: '',
+    date_of_birth: null,
+    gender: '',
+    position: '',
+    employment_status: 'active',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    emergency_contact_relationship: '',
+    bank_name: '',
+    bank_account_number: '',
+    tax_id: '',
+    notes: ''
 });
 
 const loadEmployees = async () => {
     loading.value = true;
     try {
         employees.value = await employeeService.getAll();
+        filterEmployees();
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to load employees', life: 3000 });
     } finally {
@@ -46,28 +121,111 @@ const loadEmployees = async () => {
     }
 };
 
+const filterEmployees = () => {
+    // First filter out admin users
+    const nonAdminEmployees = employees.value.filter(emp => emp.role !== 'admin');
+    
+    if (!searchTerm.value.trim()) {
+        filteredEmployees.value = nonAdminEmployees;
+        return;
+    }
+    
+    const search = searchTerm.value.toLowerCase().trim();
+    filteredEmployees.value = nonAdminEmployees.filter(emp => {
+        const fullName = `${emp.firstname} ${emp.lastname}`.toLowerCase();
+        const email = (emp.email || '').toLowerCase();
+        const department = (emp.department || '').toLowerCase();
+        const nrc = (emp.nrc || '').toLowerCase();
+        const username = (emp.username || '').toLowerCase();
+        
+        return fullName.includes(search) || 
+               email.includes(search) || 
+               department.includes(search) || 
+               nrc.includes(search) || 
+               username.includes(search);
+    });
+};
+
 const openNew = (admin = false) => {
     isAdmin.value = admin;
-    form.value = { id: null, nrc: '', username: '', firstname: '', lastname: '', email: '', password: '', department: '', role: 'employee' };
+    form.value = { 
+        id: null, 
+        nrc: '', 
+        username: '', 
+        firstname: '', 
+        lastname: '', 
+        email: '', 
+        password: '', 
+        department: '', 
+        role: 'employee', 
+        hire_date: null,
+        phone: '',
+        mobile: '',
+        address: '',
+        city: '',
+        postal_code: '',
+        date_of_birth: null,
+        gender: '',
+        position: '',
+        employment_status: 'active',
+        emergency_contact_name: '',
+        emergency_contact_phone: '',
+        emergency_contact_relationship: '',
+        bank_name: '',
+        bank_account_number: '',
+        tax_id: '',
+        notes: ''
+    };
     editMode.value = false;
     dialogVisible.value = true;
 };
 
+const openView = (item) => {
+    viewingEmployee.value = item;
+    viewDialogVisible.value = true;
+};
+
 const openEdit = (item) => {
     isAdmin.value = item.role === 'admin';
-    form.value = { ...item, password: '' };
+    // Parse hire_date if it exists (could be from employment object or direct field)
+    let hireDate = null;
+    if (item.employment?.start_date) {
+        hireDate = new Date(item.employment.start_date);
+    } else if (item.employment?.hire_date) {
+        hireDate = new Date(item.employment.hire_date);
+    } else if (item.hire_date) {
+        hireDate = new Date(item.hire_date);
+    }
+    
+    form.value = { 
+        ...item, 
+        password: '',
+        hire_date: hireDate,
+        // Ensure all fields are present, use empty string if not provided
+        phone: item.phone || '',
+        mobile: item.mobile || '',
+        address: item.address || '',
+        city: item.city || '',
+        postal_code: item.postal_code || '',
+        date_of_birth: item.date_of_birth ? new Date(item.date_of_birth) : null,
+        gender: item.gender || '',
+        position: item.position || '',
+        employment_status: item.employment_status || 'active',
+        emergency_contact_name: item.emergency_contact_name || '',
+        emergency_contact_phone: item.emergency_contact_phone || '',
+        emergency_contact_relationship: item.emergency_contact_relationship || '',
+        bank_name: item.bank_name || '',
+        bank_account_number: item.bank_account_number || '',
+        tax_id: item.tax_id || '',
+        notes: item.notes || ''
+    };
     editMode.value = true;
     dialogVisible.value = true;
 };
 
 const saveEmployee = async () => {
-    if (!form.value.firstname || !form.value.lastname || !form.value.email) {
+    if (!form.value.firstname || !form.value.lastname) {
         toast.add({ severity: 'error', summary: 'Validation Error', detail: 'Please fill required fields', life: 3000 });
-        return;
-    }
-
-    if (!editMode.value && !form.value.password) {
-        toast.add({ severity: 'error', summary: 'Validation Error', detail: 'Password is required', life: 3000 });
         return;
     }
 
@@ -77,32 +235,82 @@ const saveEmployee = async () => {
             const updateData = {
                 firstname: form.value.firstname,
                 lastname: form.value.lastname,
-                email: form.value.email,
                 department: form.value.department
             };
+            // Add optional fields if provided
+            if (form.value.email) updateData.email = form.value.email;
+            if (form.value.nrc) updateData.nrc = form.value.nrc;
+            if (form.value.phone) updateData.phone = form.value.phone;
+            if (form.value.mobile) updateData.mobile = form.value.mobile;
+            if (form.value.address) updateData.address = form.value.address;
+            if (form.value.city) updateData.city = form.value.city;
+            if (form.value.postal_code) updateData.postal_code = form.value.postal_code;
+            if (form.value.date_of_birth) {
+                const date = new Date(form.value.date_of_birth);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                updateData.date_of_birth = `${year}-${month}-${day}`;
+            }
+            if (form.value.gender) updateData.gender = form.value.gender;
+            if (form.value.position) {
+                updateData.job_title = form.value.position;
+                // Also send as position for backward compatibility
+                updateData.position = form.value.position;
+            }
+            if (form.value.employment_status) updateData.employment_status = form.value.employment_status;
+            if (form.value.emergency_contact_name) updateData.emergency_contact_name = form.value.emergency_contact_name;
+            if (form.value.emergency_contact_phone) updateData.emergency_contact_phone = form.value.emergency_contact_phone;
+            if (form.value.emergency_contact_relationship) updateData.emergency_contact_relationship = form.value.emergency_contact_relationship;
+            if (form.value.bank_name) updateData.bank_name = form.value.bank_name;
+            if (form.value.bank_account_number) updateData.bank_account_number = form.value.bank_account_number;
+            if (form.value.tax_id) updateData.tax_id = form.value.tax_id;
+            if (form.value.notes) updateData.notes = form.value.notes;
+            if (form.value.hire_date) {
+                const date = new Date(form.value.hire_date);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                updateData.hire_date = `${year}-${month}-${day}`;
+            }
             if (!isAdmin.value) updateData.role = form.value.role;
             await employeeService.update(form.value.id, updateData);
             toast.add({ severity: 'success', summary: 'Success', detail: 'Employee updated', life: 3000 });
         } else {
             if (isAdmin.value) {
-                await employeeService.createAdmin({
+                const adminData = {
                     username: form.value.username,
                     firstname: form.value.firstname,
                     lastname: form.value.lastname,
-                    email: form.value.email,
-                    password: form.value.password,
                     department: form.value.department
-                });
+                };
+                // Add email only if provided
+                if (form.value.email) {
+                    adminData.email = form.value.email;
+                }
+                await employeeService.createAdmin(adminData);
             } else {
-                await employeeService.create({
+                const createData = {
                     nrc: form.value.nrc,
                     firstname: form.value.firstname,
                     lastname: form.value.lastname,
-                    email: form.value.email,
-                    password: form.value.password,
                     department: form.value.department,
                     role: form.value.role
-                });
+                };
+                // Add email only if provided
+                if (form.value.email) {
+                    createData.email = form.value.email;
+                }
+                // Add hire_date if provided
+                if (form.value.hire_date) {
+                    // Format date as YYYY-MM-DD
+                    const date = new Date(form.value.hire_date);
+                    const year = date.getFullYear();
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const day = String(date.getDate()).padStart(2, '0');
+                    createData.hire_date = `${year}-${month}-${day}`;
+                }
+                await employeeService.create(createData);
             }
             toast.add({ severity: 'success', summary: 'Success', detail: 'Employee created', life: 3000 });
         }
@@ -133,11 +341,65 @@ const getRoleSeverity = (role) => {
     }
 };
 
+const getYearsServed = (employee) => {
+    const startDate = employee.employment?.start_date || employee.employment?.hire_date;
+    if (!startDate) return '-';
+    
+    const start = new Date(startDate);
+    const today = new Date();
+    
+    if (isNaN(start.getTime())) return '-';
+    
+    // Calculate difference in months
+    const yearsDiff = today.getFullYear() - start.getFullYear();
+    const monthsDiff = today.getMonth() - start.getMonth();
+    const daysDiff = today.getDate() - start.getDate();
+    
+    // Calculate total months
+    let totalMonths = yearsDiff * 12 + monthsDiff;
+    if (daysDiff < 0) {
+        totalMonths -= 1;
+    }
+    
+    // If less than 12 months, show months
+    if (totalMonths < 12) {
+        return totalMonths === 0 ? '< 1 month' : `${totalMonths} ${totalMonths === 1 ? 'month' : 'months'}`;
+    }
+    
+    // Calculate years and remaining months
+    const years = Math.floor(totalMonths / 12);
+    const remainingMonths = totalMonths % 12;
+    
+    if (remainingMonths === 0) {
+        return `${years} ${years === 1 ? 'year' : 'years'}`;
+    } else {
+        return `${years} ${years === 1 ? 'year' : 'years'}, ${remainingMonths} ${remainingMonths === 1 ? 'month' : 'months'}`;
+    }
+};
+
 const downloadTemplate = async () => {
     try {
         await employeeService.downloadTemplate();
     } catch (error) {
         toast.add({ severity: 'error', summary: 'Error', detail: 'Failed to download template', life: 3000 });
+    }
+};
+
+const exportAllEmployees = async () => {
+    try {
+        await employeeService.exportAll();
+        toast.add({ severity: 'success', summary: 'Success', detail: 'Employees exported successfully', life: 3000 });
+    } catch (error) {
+        toast.add({ severity: 'error', summary: 'Error', detail: error.userMessage || 'Failed to export employees', life: 3000 });
+    }
+};
+
+const exportEmployee = async (id) => {
+    try {
+        await employeeService.exportEmployee(id);
+        toast.add({ severity: 'success', summary: 'Success', detail: 'Employee exported successfully', life: 3000 });
+    } catch (error) {
+        toast.add({ severity: 'error', summary: 'Error', detail: error.userMessage || 'Failed to export employee', life: 3000 });
     }
 };
 
@@ -171,11 +433,32 @@ const handleFileUpload = async (event) => {
 onMounted(() => loadEmployees());
 </script>
 
+<style scoped>
+:deep(.p-datatable-tbody > tr) {
+    transition: background-color 0.2s ease;
+}
+
+:deep(.p-datatable-tbody > tr:hover) {
+    background-color: var(--surface-100) !important;
+    cursor: pointer;
+}
+</style>
+
 <template>
     <div class="card">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-semibold m-0">Employees</h2>
             <div class="flex gap-2">
+                <span class="p-input-icon-left">
+                    <!-- <i class="pi pi-search" /> -->
+                    <InputText 
+                        v-model="searchTerm" 
+                        placeholder="Search employees..." 
+                        class="w-64"
+                        @input="filterEmployees"
+                    />
+                </span>
+                <Button label="Export All" icon="pi pi-file-pdf" severity="danger" outlined @click="exportAllEmployees" />
                 <Button label="Download Template" icon="pi pi-download" severity="secondary" outlined @click="downloadTemplate" />
                 <Button label="Bulk Upload" icon="pi pi-upload" severity="secondary" @click="openUploadDialog" />
                 <Button label="Add Employee" icon="pi pi-plus" @click="openNew(false)" />
@@ -183,14 +466,13 @@ onMounted(() => loadEmployees());
             </div>
         </div>
         
-        <DataTable :value="employees" :loading="loading" stripedRows paginator :rows="10">
-            <Column field="id" header="ID" sortable style="width: 60px" />
+        <DataTable :value="filteredEmployees" :loading="loading" stripedRows paginator :rows="10" @row-click="(e) => { if (!e.originalEvent.target.closest('button')) openView(e.data); }" class="cursor-pointer">
             <Column header="Name">
                 <template #body="{ data }">
                     {{ data.firstname }} {{ data.lastname }}
                 </template>
             </Column>
-            <Column header="NRC/Username">
+            <Column header="NRC">
                 <template #body="{ data }">
                     {{ data.nrc || data.username || '-' }}
                 </template>
@@ -202,9 +484,27 @@ onMounted(() => loadEmployees());
                     <Tag :value="data.role" :severity="getRoleSeverity(data.role)" />
                 </template>
             </Column>
-            <Column header="Actions" style="width: 200px">
+            <Column header="Start Date">
+                <template #body="{ data }">
+                    {{ data.employment?.start_date ? formatDate(data.employment.start_date) : (data.employment?.hire_date ? formatDate(data.employment.hire_date) : '-') }}
+                </template>
+            </Column>
+            <Column header="Tenure">
+                <template #body="{ data }">
+                    {{ getYearsServed(data) }}
+                </template>
+            </Column>
+            <Column header="Actions" style="width: 250px">
                 <template #body="{ data }">
                     <div class="flex gap-2">
+                        <Button 
+                            icon="pi pi-file-pdf" 
+                            size="small" 
+                            severity="danger" 
+                            outlined 
+                            @click="exportEmployee(data.id)"
+                            v-tooltip.top="'Export to PDF'"
+                        />
                         <Button 
                             icon="pi pi-chart-line" 
                             size="small" 
@@ -220,15 +520,12 @@ onMounted(() => loadEmployees());
             </Column>
         </DataTable>
         
-        <Dialog v-model:visible="dialogVisible" :header="editMode ? 'Edit Employee' : (isAdmin ? 'New Admin' : 'New Employee')" modal style="width: 500px">
+        <Dialog v-model:visible="dialogVisible" :header="editMode ? 'Edit Employee' : (isAdmin ? 'New Admin' : 'New Employee')" modal :style="{ width: editMode ? '800px' : '500px' }">
             <div class="grid grid-cols-2 gap-4">
+                <!-- Basic Information -->
                 <div v-if="!editMode && isAdmin">
                     <label class="block font-medium mb-2">Username *</label>
                     <InputText v-model="form.username" class="w-full" />
-                </div>
-                <div v-if="!editMode && !isAdmin">
-                    <label class="block font-medium mb-2">NRC *</label>
-                    <InputText v-model="form.nrc" class="w-full" placeholder="123456/78/9" />
                 </div>
                 <div>
                     <label class="block font-medium mb-2">First Name *</label>
@@ -238,22 +535,113 @@ onMounted(() => loadEmployees());
                     <label class="block font-medium mb-2">Last Name *</label>
                     <InputText v-model="form.lastname" class="w-full" />
                 </div>
-                <div class="col-span-2">
-                    <label class="block font-medium mb-2">Email *</label>
+                <div v-if="!isAdmin">
+                    <label class="block font-medium mb-2">NRC</label>
+                    <InputText v-model="form.nrc" class="w-full" placeholder="123456/78/9" />
+                </div>
+                <div v-if="!isAdmin">
+                    <label class="block font-medium mb-2">Start Date / Hire Date</label>
+                    <Calendar v-model="form.hire_date" dateFormat="yy-mm-dd" showIcon class="w-full" placeholder="Select start date" />
+                </div>
+                <div v-if="!editMode && !isAdmin">
+                    <label class="block font-medium mb-2">Email</label>
                     <InputText v-model="form.email" type="email" class="w-full" />
                 </div>
-                <div v-if="!editMode" class="col-span-2">
-                    <label class="block font-medium mb-2">Password *</label>
-                    <Password v-model="form.password" class="w-full" :feedback="false" toggleMask />
+                <div v-if="editMode || isAdmin" class="col-span-2">
+                    <label class="block font-medium mb-2">Email</label>
+                    <InputText v-model="form.email" type="email" class="w-full" />
                 </div>
                 <div>
                     <label class="block font-medium mb-2">Department</label>
-                    <InputText v-model="form.department" class="w-full" />
+                    <Select v-model="form.department" :options="departments" placeholder="Select Department" class="w-full" />
                 </div>
                 <div v-if="!isAdmin">
                     <label class="block font-medium mb-2">Role</label>
                     <Select v-model="form.role" :options="roles" optionLabel="label" optionValue="value" class="w-full" />
                 </div>
+                <div v-if="editMode">
+                    <label class="block font-medium mb-2">Position</label>
+                    <InputText v-model="form.position" class="w-full" placeholder="e.g., Senior Lecturer, IT Support" />
+                </div>
+                <div v-if="editMode">
+                    <label class="block font-medium mb-2">Employment Status</label>
+                    <Select v-model="form.employment_status" :options="employmentStatuses" optionLabel="label" optionValue="value" class="w-full" />
+                </div>
+                
+                <!-- Additional fields for edit mode -->
+                <template v-if="editMode">
+                    <div class="col-span-2">
+                        <h3 class="text-lg font-semibold mt-4 mb-2">Personal Information</h3>
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Date of Birth</label>
+                        <Calendar v-model="form.date_of_birth" dateFormat="yy-mm-dd" showIcon class="w-full" placeholder="Select date of birth" />
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Gender</label>
+                        <Select v-model="form.gender" :options="genders" placeholder="Select Gender" class="w-full" />
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block font-medium mb-2">Address</label>
+                        <InputText v-model="form.address" class="w-full" placeholder="Street address" />
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">City</label>
+                        <InputText v-model="form.city" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Postal Code</label>
+                        <InputText v-model="form.postal_code" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Phone</label>
+                        <InputText v-model="form.phone" class="w-full" placeholder="Landline" />
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Mobile</label>
+                        <InputText v-model="form.mobile" class="w-full" placeholder="Mobile number" />
+                    </div>
+                    
+                    <div class="col-span-2">
+                        <h3 class="text-lg font-semibold mt-4 mb-2">Emergency Contact</h3>
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Contact Name</label>
+                        <InputText v-model="form.emergency_contact_name" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Contact Phone</label>
+                        <InputText v-model="form.emergency_contact_phone" class="w-full" />
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block font-medium mb-2">Relationship</label>
+                        <Select v-model="form.emergency_contact_relationship" :options="emergencyContactRelationships" placeholder="Select Relationship" class="w-full" />
+                    </div>
+                    
+                    <div class="col-span-2">
+                        <h3 class="text-lg font-semibold mt-4 mb-2">Financial Information</h3>
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Bank Name</label>
+                        <InputText v-model="form.bank_name" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Bank Account Number</label>
+                        <InputText v-model="form.bank_account_number" class="w-full" />
+                    </div>
+                    <div>
+                        <label class="block font-medium mb-2">Tax ID</label>
+                        <InputText v-model="form.tax_id" class="w-full" />
+                    </div>
+                    
+                    <div class="col-span-2">
+                        <h3 class="text-lg font-semibold mt-4 mb-2">Additional Notes</h3>
+                    </div>
+                    <div class="col-span-2">
+                        <label class="block font-medium mb-2">Notes</label>
+                        <Textarea v-model="form.notes" class="w-full" rows="4" placeholder="Additional notes or comments" />
+                    </div>
+                </template>
             </div>
             <template #footer>
                 <Button label="Cancel" severity="secondary" @click="dialogVisible = false" />
@@ -298,6 +686,136 @@ onMounted(() => loadEmployees());
             
             <template #footer>
                 <Button label="Close" @click="uploadDialogVisible = false" />
+            </template>
+        </Dialog>
+
+        <!-- View Employee Dialog -->
+        <Dialog v-model:visible="viewDialogVisible" header="Employee Details" modal :style="{ width: '800px' }">
+            <div v-if="viewingEmployee" class="grid grid-cols-2 gap-4">
+                <!-- Basic Information -->
+                <div class="col-span-2">
+                    <h3 class="text-lg font-semibold mb-3 pb-2 border-b">Basic Information</h3>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">First Name</label>
+                    <p class="text-900">{{ viewingEmployee.firstname || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Last Name</label>
+                    <p class="text-900">{{ viewingEmployee.lastname || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">NRC / Username</label>
+                    <p class="text-900">{{ viewingEmployee.nrc || viewingEmployee.username || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Email</label>
+                    <p class="text-900">{{ viewingEmployee.email || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Department</label>
+                    <p class="text-900">{{ viewingEmployee.department || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Role</label>
+                    <p class="text-900">{{ viewingEmployee.role || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Position</label>
+                    <p class="text-900">{{ viewingEmployee.job_title || viewingEmployee.position || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Employment Status</label>
+                    <p class="text-900">{{ viewingEmployee.employment_status || 'active' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Start Date / Hire Date</label>
+                    <p class="text-900">{{ viewingEmployee.employment?.start_date ? formatDate(viewingEmployee.employment.start_date) : (viewingEmployee.employment?.hire_date ? formatDate(viewingEmployee.employment.hire_date) : (viewingEmployee.hire_date ? formatDate(viewingEmployee.hire_date) : '-')) }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Tenure</label>
+                    <p class="text-900">{{ getYearsServed(viewingEmployee) }}</p>
+                </div>
+
+                <!-- Personal Information -->
+                <div class="col-span-2 mt-4">
+                    <h3 class="text-lg font-semibold mb-3 pb-2 border-b">Personal Information</h3>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Date of Birth</label>
+                    <p class="text-900">{{ viewingEmployee.date_of_birth ? formatDate(viewingEmployee.date_of_birth) : '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Gender</label>
+                    <p class="text-900">{{ viewingEmployee.gender || '-' }}</p>
+                </div>
+                <div class="col-span-2">
+                    <label class="block font-medium mb-1 text-600">Address</label>
+                    <p class="text-900">{{ viewingEmployee.address || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">City</label>
+                    <p class="text-900">{{ viewingEmployee.city || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Postal Code</label>
+                    <p class="text-900">{{ viewingEmployee.postal_code || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Phone</label>
+                    <p class="text-900">{{ viewingEmployee.phone || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Mobile</label>
+                    <p class="text-900">{{ viewingEmployee.mobile || '-' }}</p>
+                </div>
+
+                <!-- Emergency Contact -->
+                <div class="col-span-2 mt-4">
+                    <h3 class="text-lg font-semibold mb-3 pb-2 border-b">Emergency Contact</h3>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Contact Name</label>
+                    <p class="text-900">{{ viewingEmployee.emergency_contact_name || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Contact Phone</label>
+                    <p class="text-900">{{ viewingEmployee.emergency_contact_phone || '-' }}</p>
+                </div>
+                <div class="col-span-2">
+                    <label class="block font-medium mb-1 text-600">Relationship</label>
+                    <p class="text-900">{{ viewingEmployee.emergency_contact_relationship || '-' }}</p>
+                </div>
+
+                <!-- Financial Information -->
+                <div class="col-span-2 mt-4">
+                    <h3 class="text-lg font-semibold mb-3 pb-2 border-b">Financial Information</h3>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Bank Name</label>
+                    <p class="text-900">{{ viewingEmployee.bank_name || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Bank Account Number</label>
+                    <p class="text-900">{{ viewingEmployee.bank_account_number || '-' }}</p>
+                </div>
+                <div>
+                    <label class="block font-medium mb-1 text-600">Tax ID</label>
+                    <p class="text-900">{{ viewingEmployee.tax_id || '-' }}</p>
+                </div>
+
+                <!-- Additional Notes -->
+                <div class="col-span-2 mt-4">
+                    <h3 class="text-lg font-semibold mb-3 pb-2 border-b">Additional Notes</h3>
+                </div>
+                <div class="col-span-2">
+                    <label class="block font-medium mb-1 text-600">Notes</label>
+                    <p class="text-900 whitespace-pre-wrap">{{ viewingEmployee.notes || '-' }}</p>
+                </div>
+            </div>
+            <template #footer>
+                <Button label="Edit" icon="pi pi-pencil" @click="viewDialogVisible = false; openEdit(viewingEmployee)" />
+                <Button label="Close" severity="secondary" @click="viewDialogVisible = false" />
             </template>
         </Dialog>
     </div>

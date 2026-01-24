@@ -2,7 +2,7 @@
   <div class="card">
     <div class="flex justify-content-between align-items-center mb-4">
       <h2 class="text-2xl font-semibold m-0">Department Leave Report</h2>
-      <div class="flex gap-2">
+      <div class="flex ml-auto gap-2">
         <Button 
           label="Export Excel" 
           icon="pi pi-file-excel" 
@@ -59,30 +59,19 @@
             />
           </template>
         </Column>
-        <Column field="pending_requests" header="Pending Requests" sortable>
-          <template #body="{ data }">
-            <Badge v-if="data.pending_requests > 0" :value="data.pending_requests" severity="warning" />
-            <span v-else>0</span>
-          </template>
-        </Column>
-        <Column field="upcoming_leaves" header="Upcoming Leaves" sortable>
-          <template #body="{ data }">
-            <Badge v-if="data.upcoming_leaves > 0" :value="data.upcoming_leaves" severity="info" />
-            <span v-else>0</span>
-          </template>
-        </Column>
       </DataTable>
     </div>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue';
-import { useToast } from 'primevue/usetoast';
 import { hrLeaveService } from '@/service/api.service';
+import { useToast } from 'primevue/usetoast';
+import { onMounted, ref } from 'vue';
 
 const toast = useToast();
 const loading = ref(false);
+const exporting = ref(false);
 const reports = ref([]);
 
 const loadReport = async () => {
