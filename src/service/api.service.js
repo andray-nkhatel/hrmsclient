@@ -388,8 +388,23 @@ export const leaveTypeService = {
 
 // Employee Service (admin)
 export const employeeService = {
-  async getAll() {
-    const response = await apiClient.get('/api/employees');
+  async getAll(params = {}) {
+    const queryParams = new URLSearchParams();
+    
+    // If search parameter is provided and not empty, add it to query
+    if (params.search !== undefined && params.search !== null) {
+      const searchTrimmed = params.search.trim();
+      if (searchTrimmed.length > 0) {
+        queryParams.append('search', searchTrimmed);
+      } else {
+        // If search is explicitly provided but empty, return empty array (for autocomplete)
+        return [];
+      }
+    }
+    
+    // Build URL - if no search param, call without query string to get all employees
+    const url = queryParams.toString() ? `/api/employees?${queryParams.toString()}` : '/api/employees';
+    const response = await apiClient.get(url);
     return response.data;
   },
 

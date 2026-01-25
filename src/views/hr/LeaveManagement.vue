@@ -104,8 +104,6 @@
         :rows="20" 
         stripedRows
         sortMode="multiple"
-        v-model:selection="selectedLeaves"
-        selectionMode="multiple"
         dataKey="id"
         :globalFilterFields="['employee.firstname', 'employee.lastname', 'leave_type.name', 'status']"
         v-model:filters="filters"
@@ -120,8 +118,6 @@
             </span>
           </div>
         </template>
-
-        <Column selectionMode="multiple" headerStyle="width: 3rem"></Column>
         <Column field="employee.firstname" header="Employee" sortable>
           <template #body="{ data }">
             {{ data.employee?.firstname }} {{ data.employee?.lastname }}
@@ -151,13 +147,13 @@
             />
           </template>
         </Column>
-        <Column header="Actions" :exportable="false" headerStyle="width: 220px; min-width: 220px" style="width: 220px; min-width: 220px">
+        <Column header="Files" :exportable="false" headerStyle="width: 120px; min-width: 120px" style="width: 120px; min-width: 120px">
           <template #body="{ data }">
             <div class="flex gap-2 align-items-center justify-content-center">
               <Button
-                v-if="data.form_file_path"
-                icon="pi pi-download"
-                severity="info"
+                v-if="data.form_file_path && data.form_file_path.trim() !== ''"
+                icon="pi pi-file-pdf"
+                severity="danger"
                 text
                 rounded
                 size="small"
@@ -166,27 +162,11 @@
                 aria-label="Download Leave Form"
                 class="p-button-sm"
               />
-              <Button
-                icon="pi pi-pencil"
-                severity="secondary"
-                text
-                rounded
-                size="small"
-                v-tooltip.top="'Edit Leave'"
-                @click="editLeave(data)"
-                aria-label="Edit Leave"
-                class="p-button-sm"
-              />
-              <Button
-                icon="pi pi-trash"
-                severity="danger"
-                text
-                rounded
-                size="small"
-                v-tooltip.top="'Delete Leave'"
-                @click="deleteLeave(data)"
-                aria-label="Delete Leave"
-                class="p-button-sm"
+              <i
+                v-else
+                class="pi pi-question-circle text-surface-400"
+                v-tooltip.top="'No file attached'"
+                style="font-size: 1.5rem; cursor: default;"
               />
             </div>
           </template>
@@ -212,71 +192,6 @@
       @created="loadLeaves"
     />
 
-    <!-- Bulk Actions Dialog -->
-    <Dialog 
-      v-model:visible="showBulkActions" 
-      header="Bulk Actions" 
-      modal 
-      :style="{ width: '500px' }"
-    >
-      <div class="grid gap-4 mt-3">
-        <div class="col-12">
-          <div class="p-3 bg-blue-50 border-round">
-            <strong>{{ selectedLeaves.length }}</strong> leave(s) selected
-          </div>
-        </div>
-        <div class="col-12">
-          <Button
-            label="Delete Selected"
-            icon="pi pi-trash"
-            severity="danger"
-            @click="bulkDelete"
-            class="w-full"
-            :loading="bulkProcessing"
-          />
-        </div>
-        <div class="col-12">
-          <Button
-            label="Change Status"
-            icon="pi pi-check-circle"
-            @click="showStatusChangeDialog = true"
-            class="w-full"
-            :loading="bulkProcessing"
-          />
-        </div>
-      </div>
-    </Dialog>
-
-    <!-- Status Change Dialog -->
-    <Dialog 
-      v-model:visible="showStatusChangeDialog" 
-      header="Change Status" 
-      modal 
-      :style="{ width: '400px' }"
-    >
-      <div class="grid gap-4 mt-3">
-        <div class="col-12">
-          <label class="block font-medium mb-2">New Status *</label>
-          <Dropdown
-            v-model="newStatus"
-            :options="statusOptions"
-            optionLabel="label"
-            optionValue="value"
-            placeholder="Select status"
-            class="w-full"
-          />
-        </div>
-      </div>
-      <template #footer>
-        <Button label="Cancel" severity="secondary" @click="showStatusChangeDialog = false" />
-        <Button 
-          label="Update" 
-          @click="bulkUpdateStatus" 
-          :loading="bulkProcessing"
-          icon="pi pi-check"
-        />
-      </template>
-    </Dialog>
   </div>
 </template>
 
@@ -290,7 +205,6 @@ import Dialog from 'primevue/dialog';
 import InputText from 'primevue/inputtext';
 import ProgressSpinner from 'primevue/progressspinner';
 import Tag from 'primevue/tag';
-import { useConfirm } from 'primevue/useconfirm';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
 import BulkLeaveImport from './BulkLeaveImport.vue';
@@ -298,25 +212,13 @@ import LeaveTemplateDialog from './LeaveTemplateDialog.vue';
 import QuickLeaveEntry from './QuickLeaveEntry.vue';
 
 const toast = useToast();
-const confirm = useConfirm();
 const loading = ref(false);
 const leaves = ref([]);
-const selectedLeaves = ref([]);
 const showQuickEntry = ref(false);
 const showBulkImport = ref(false);
 const showTemplateDialog = ref(false);
-const showBulkActions = ref(false);
-const showStatusChangeDialog = ref(false);
-const bulkProcessing = ref(false);
-const newStatus = ref(null);
 
 
-const statusOptions = [
-  { label: 'Approved', value: 'Approved' },
-  { label: 'Pending', value: 'Pending' },
-  { label: 'Rejected', value: 'Rejected' },
-  { label: 'Cancelled', value: 'Cancelled' }
-];
 
 const filters = ref({
   global: { value: null, matchMode: 'contains' }
@@ -408,15 +310,6 @@ const loadLeaves = async () => {
 };
 
 
-const editLeave = (leave) => {
-  // TODO: Implement edit functionality
-  toast.add({
-    severity: 'info',
-    summary: 'Info',
-    detail: 'Edit functionality coming soon',
-    life: 3000
-  });
-};
 
 const downloadLeaveForm = async (leave) => {
   try {
@@ -437,103 +330,20 @@ const downloadLeaveForm = async (leave) => {
   }
 };
 
-const deleteLeave = (leave) => {
-  confirm.require({
-    message: `Are you sure you want to delete this leave for ${leave.employee?.firstname} ${leave.employee?.lastname}?`,
-    header: 'Confirm Delete',
-    icon: 'pi pi-exclamation-triangle',
-    accept: async () => {
-      try {
-        // TODO: Implement delete endpoint
-        toast.add({
-          severity: 'success',
-          summary: 'Success',
-          detail: 'Leave deleted successfully',
-          life: 3000
-        });
-        loadLeaves();
-      } catch (error) {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: error.userMessage || 'Failed to delete leave',
-          life: 3000
-        });
-      }
-    }
-  });
-};
 
-const bulkDelete = () => {
-  confirm.require({
-    message: `Are you sure you want to delete ${selectedLeaves.value.length} selected leave(s)?`,
-    header: 'Confirm Bulk Delete',
-    icon: 'pi pi-exclamation-triangle',
-    accept: async () => {
-      bulkProcessing.value = true;
-      try {
-        // TODO: Implement bulk delete endpoint
-        toast.add({
-          severity: 'success',
-          summary: 'Success',
-          detail: `${selectedLeaves.value.length} leave(s) deleted successfully`,
-          life: 3000
-        });
-        selectedLeaves.value = [];
-        showBulkActions.value = false;
-        loadLeaves();
-      } catch (error) {
-        toast.add({
-          severity: 'error',
-          summary: 'Error',
-          detail: error.userMessage || 'Failed to delete leaves',
-          life: 3000
-        });
-      } finally {
-        bulkProcessing.value = false;
-      }
-    }
-  });
-};
-
-const bulkUpdateStatus = async () => {
-  if (!newStatus.value) {
-    toast.add({
-      severity: 'error',
-      summary: 'Validation Error',
-      detail: 'Please select a status',
-      life: 3000
-    });
-    return;
-  }
-
-  bulkProcessing.value = true;
-  try {
-    // TODO: Implement bulk status update endpoint
-    toast.add({
-      severity: 'success',
-      summary: 'Success',
-      detail: `Status updated for ${selectedLeaves.value.length} leave(s)`,
-      life: 3000
-    });
-    selectedLeaves.value = [];
-    showBulkActions.value = false;
-    showStatusChangeDialog.value = false;
-    newStatus.value = null;
-    loadLeaves();
-  } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: error.userMessage || 'Failed to update status',
-      life: 3000
-    });
-  } finally {
-    bulkProcessing.value = false;
-  }
-};
 
 onMounted(() => {
   loadLeaves();
 });
 </script>
+
+<style scoped>
+:deep(.p-datatable-tbody > tr) {
+  transition: background-color 0.2s ease;
+}
+
+:deep(.p-datatable-tbody > tr:hover) {
+  background-color: var(--surface-100) !important;
+  cursor: pointer;
+}
+</style>

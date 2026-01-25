@@ -24,18 +24,21 @@
               :suggestions="employeeSuggestions"
               @complete="searchEmployees"
               optionLabel="name"
-              placeholder="Search employee..."
+              placeholder="Search employee by name..."
               class="w-full"
               :loading="searchingEmployees"
+              :minLength="1"
+              :completeOnFocus="false"
+              :dropdown="false"
             >
             <template #option="slotProps">
-              <div class="flex align-items-center">
-                <div>
-                  <div>{{ slotProps.option.name }}</div>
-                </div>
+              <div class="flex align-items-center justify-content-between w-full">
+                <div class="flex-1">
+                  <div class="font-medium">{{ slotProps.option.name }}</div>
                   <small class="text-surface-500">{{ slotProps.option.department || 'No department' }}</small>
                 </div>
-              </template>
+              </div>
+            </template>
             </AutoComplete>
           </div>
 
@@ -115,7 +118,7 @@
         <FileUpload
           mode="basic"
           :auto="true"
-          :maxFileSize="10000000"
+          :maxFileSize="5242880"
           accept=".png,.pdf"
           chooseLabel="Choose Leave Form"
           @select="onFileSelect"
@@ -156,8 +159,8 @@ import { employeeService, hrLeaveService, leaveService } from '@/service/api.ser
 import { formatDateForAPI } from '@/service/dateUtils';
 import AutoComplete from 'primevue/autocomplete';
 import DatePicker from 'primevue/datepicker';
-import Textarea from 'primevue/textarea';
 import FileUpload from 'primevue/fileupload';
+import Textarea from 'primevue/textarea';
 import { useToast } from 'primevue/usetoast';
 import { computed, ref, watch } from 'vue';
 
@@ -221,25 +224,61 @@ watch([() => form.value.employeeId, () => form.value.leaveTypeId, () => form.val
   }
 );
 
+// Debounce search to avoid too many API calls
+let searchTimeout = null;
+
 const searchEmployees = async (event) => {
-  searchingEmployees.value = true;
-  try {
-    const employees = await employeeService.getAll({ search: event.query });
-    employeeSuggestions.value = employees.map(emp => ({
-      name: `${emp.firstname} ${emp.lastname}`,
-      id: emp.id,
-      department: emp.department?.name || emp.department_name
-    }));
-  } catch (error) {
-    toast.add({
-      severity: 'error',
-      summary: 'Error',
-      detail: 'Failed to search employees',
-      life: 3000
-    });
-  } finally {
-    searchingEmployees.value = false;
+  const query = event.query || '';
+  const trimmedQuery = query.trim();
+  
+  // Clear previous timeout
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+    searchTimeout = null;
   }
+  
+  // If query is empty or too short, clear suggestions and return immediately
+  if (!trimmedQuery || trimmedQuery.length < 1) {
+    employeeSuggestions.value = [];
+    searchingEmployees.value = false;
+    return;
+  }
+  
+  // Debounce the search - wait 300ms after user stops typing
+  // This prevents API calls on every keystroke
+  searchTimeout = setTimeout(async () => {
+    // Double-check query is still valid (user might have cleared it during timeout)
+    const currentQuery = (event.query || '').trim();
+    if (!currentQuery || currentQuery.length < 1) {
+      employeeSuggestions.value = [];
+      searchingEmployees.value = false;
+      return;
+    }
+    
+    searchingEmployees.value = true;
+    try {
+      // Make API call with search parameter
+      const employees = await employeeService.getAll({ search: currentQuery });
+      
+      // Map employees to suggestion format
+      employeeSuggestions.value = employees.map(emp => ({
+        name: `${emp.firstname} ${emp.lastname}`,
+        id: emp.id,
+        department: emp.department || 'No department'
+      }));
+    } catch (error) {
+      console.error('Error searching employees:', error);
+      toast.add({
+        severity: 'error',
+        summary: 'Error',
+        detail: 'Failed to search employees',
+        life: 3000
+      });
+      employeeSuggestions.value = [];
+    } finally {
+      searchingEmployees.value = false;
+    }
+  }, 300);
 };
 
 const loadLeaveTypes = async () => {
@@ -458,13 +497,13 @@ const onFileSelect = (event) => {
       return;
     }
     
-    // Validate file size (10MB max)
-    const maxSize = 10 * 1024 * 1024; // 10MB
+    // Validate file size (5MB max)
+    const maxSize = 5 * 1024 * 1024; // 5MB
     if (file.size > maxSize) {
       toast.add({
         severity: 'error',
         summary: 'File Too Large',
-        detail: 'File size must be less than 10MB',
+        detail: 'File size must be less than 5MB',
         life: 3000
       });
       return;
@@ -495,9 +534,17 @@ const resetForm = () => {
     reason: ''
   };
   selectedEmployee.value = null;
+  employeeSuggestions.value = [];
   balanceInfo.value = null;
   selectedFile.value = null;
   formSubmitted.value = false;
+  
+  // Clear any pending search timeout
+  if (searchTimeout) {
+    clearTimeout(searchTimeout);
+    searchTimeout = null;
+  }
+  searchingEmployees.value = false;
 };
 
 const close = () => {
