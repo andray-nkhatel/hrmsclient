@@ -2,6 +2,8 @@
 import { leaveTypeService } from '@/service/api.service';
 import { useToast } from 'primevue/usetoast';
 import { onMounted, ref } from 'vue';
+import Checkbox from 'primevue/checkbox';
+import Tag from 'primevue/tag';
 
 const toast = useToast();
 const leaveTypes = ref([]);
@@ -13,7 +15,8 @@ const submitting = ref(false);
 const form = ref({
     id: null,
     name: '',
-    max_days: 1
+    max_days: 1,
+    uses_balance: false
 });
 
 const loadLeaveTypes = async () => {
@@ -28,13 +31,13 @@ const loadLeaveTypes = async () => {
 };
 
 const openNew = () => {
-    form.value = { id: null, name: '', max_days: 1 };
+    form.value = { id: null, name: '', max_days: 1, uses_balance: false };
     editMode.value = false;
     dialogVisible.value = true;
 };
 
 const openEdit = (item) => {
-    form.value = { ...item };
+    form.value = { ...item, uses_balance: item.uses_balance ?? false };
     editMode.value = true;
     dialogVisible.value = true;
 };
@@ -47,11 +50,12 @@ const saveLeaveType = async () => {
 
     submitting.value = true;
     try {
+        const payload = { name: form.value.name, max_days: form.value.max_days, uses_balance: form.value.uses_balance };
         if (editMode.value) {
-            await leaveTypeService.update(form.value.id, { name: form.value.name, max_days: form.value.max_days });
+            await leaveTypeService.update(form.value.id, payload);
             toast.add({ severity: 'success', summary: 'Success', detail: 'Leave type updated', life: 3000 });
         } else {
-            await leaveTypeService.create({ name: form.value.name, max_days: form.value.max_days });
+            await leaveTypeService.create(payload);
             toast.add({ severity: 'success', summary: 'Success', detail: 'Leave type created', life: 3000 });
         }
         dialogVisible.value = false;
@@ -87,6 +91,11 @@ onMounted(() => loadLeaveTypes());
             <Column field="id" header="ID" sortable style="width: 80px" />
             <Column field="name" header="Name" sortable />
             <Column field="max_days" header="Max Days" sortable style="width: 120px" />
+            <Column header="Uses Balance" style="width: 130px">
+                <template #body="{ data }">
+                    <Tag :value="data.uses_balance ? 'Yes' : 'Record only'" :severity="data.uses_balance ? 'success' : 'secondary'" />
+                </template>
+            </Column>
             <Column header="Actions" style="width: 150px">
                 <template #body="{ data }">
                     <div class="flex gap-2">
@@ -106,6 +115,13 @@ onMounted(() => loadLeaveTypes());
                 <label class="block font-medium mb-2">Max Days</label>
                 <InputNumber v-model="form.max_days" :min="1" class="w-full" />
             </div>
+            <div class="mb-4 flex align-items-center gap-2">
+                <Checkbox v-model="form.uses_balance" :binary="true" inputId="uses_balance" />
+                <label for="uses_balance" class="cursor-pointer">Uses balance (deduct from accrual)</label>
+            </div>
+            <p v-if="!form.uses_balance" class="text-sm text-surface-500 mt-0 mb-4">
+                When unchecked, leave is record-only: it is added to the employee's record but not deducted from any balance.
+            </p>
             <template #footer>
                 <Button label="Cancel" severity="secondary" @click="dialogVisible = false" />
                 <Button label="Save" @click="saveLeaveType" :loading="submitting" />

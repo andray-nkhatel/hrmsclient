@@ -18,6 +18,11 @@ const form = ref({
     reason: ''
 });
 
+const selectedLeaveType = computed(() => {
+    if (!form.value.leave_type_id || !leaveTypes.value.length) return null;
+    return leaveTypes.value.find(lt => lt.id === form.value.leave_type_id) || null;
+});
+
 const minDate = computed(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -114,6 +119,9 @@ onMounted(() => {
                 <Select id="leaveType" v-model="form.leave_type_id" :options="leaveTypes" 
                         optionLabel="name" optionValue="id" placeholder="Select leave type" 
                         class="w-full" :loading="loading" />
+                <small v-if="selectedLeaveType && !selectedLeaveType.uses_balance" class="text-surface-500 block mt-1">
+                    Record only — this leave will not be deducted from your balance.
+                </small>
             </div>
             
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">

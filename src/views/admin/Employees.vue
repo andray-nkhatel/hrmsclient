@@ -87,6 +87,7 @@ const form = ref({
     lastname: '',
     email: '',
     password: '',
+    confirmPassword: '',
     department: '',
     role: 'employee',
     hire_date: null,
@@ -156,6 +157,7 @@ const openNew = (admin = false) => {
         lastname: '', 
         email: '', 
         password: '', 
+        confirmPassword: '', 
         department: '', 
         role: 'employee', 
         hire_date: null,
@@ -278,10 +280,26 @@ const saveEmployee = async () => {
             toast.add({ severity: 'success', summary: 'Success', detail: 'Employee updated', life: 3000 });
         } else {
             if (isAdmin.value) {
+                if (!form.value.username?.trim()) {
+                    toast.add({ severity: 'error', summary: 'Validation Error', detail: 'Username is required', life: 3000 });
+                    submitting.value = false;
+                    return;
+                }
+                if (!form.value.password || form.value.password.length < 6) {
+                    toast.add({ severity: 'error', summary: 'Validation Error', detail: 'Password is required (min 6 characters)', life: 3000 });
+                    submitting.value = false;
+                    return;
+                }
+                if (form.value.password !== form.value.confirmPassword) {
+                    toast.add({ severity: 'error', summary: 'Validation Error', detail: 'Password and Confirm password do not match', life: 3000 });
+                    submitting.value = false;
+                    return;
+                }
                 const adminData = {
-                    username: form.value.username,
+                    username: form.value.username.trim(),
                     firstname: form.value.firstname,
                     lastname: form.value.lastname,
+                    password: form.value.password,
                     department: form.value.department
                 };
                 // Add email only if provided
@@ -290,10 +308,26 @@ const saveEmployee = async () => {
                 }
                 await employeeService.createAdmin(adminData);
             } else {
+                if (!form.value.nrc?.trim()) {
+                    toast.add({ severity: 'error', summary: 'Validation Error', detail: 'NRC is required', life: 3000 });
+                    submitting.value = false;
+                    return;
+                }
+                if (!form.value.password || form.value.password.length < 6) {
+                    toast.add({ severity: 'error', summary: 'Validation Error', detail: 'Password is required (min 6 characters)', life: 3000 });
+                    submitting.value = false;
+                    return;
+                }
+                if (form.value.password !== form.value.confirmPassword) {
+                    toast.add({ severity: 'error', summary: 'Validation Error', detail: 'Password and Confirm password do not match', life: 3000 });
+                    submitting.value = false;
+                    return;
+                }
                 const createData = {
-                    nrc: form.value.nrc,
+                    nrc: form.value.nrc.trim(),
                     firstname: form.value.firstname,
                     lastname: form.value.lastname,
+                    password: form.value.password,
                     department: form.value.department,
                     role: form.value.role
                 };
@@ -554,6 +588,14 @@ onMounted(() => loadEmployees());
                 <div>
                     <label class="block font-medium mb-2">Department</label>
                     <Select v-model="form.department" :options="departments" placeholder="Select Department" class="w-full" />
+                </div>
+                <div v-if="!editMode" class="col-span-2">
+                    <label class="block font-medium mb-2">Password *</label>
+                    <InputText v-model="form.password" type="password" class="w-full" placeholder="Min 6 characters" autocomplete="new-password" />
+                </div>
+                <div v-if="!editMode" class="col-span-2">
+                    <label class="block font-medium mb-2">Confirm Password *</label>
+                    <InputText v-model="form.confirmPassword" type="password" class="w-full" placeholder="Re-enter password" autocomplete="new-password" />
                 </div>
                 <div v-if="!isAdmin">
                     <label class="block font-medium mb-2">Role</label>

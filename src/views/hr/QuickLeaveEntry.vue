@@ -1,7 +1,7 @@
 <template>
   <Dialog 
     v-model:visible="visible" 
-    header="Quick Annual Leave Entry" 
+    header="Quick Leave Entry" 
     modal 
     :style="{ width: '600px' }"
     @hide="resetForm"
@@ -10,9 +10,28 @@
       <div class="col-12">
         <div class="p-3 bg-blue-50 border-round mb-3">
           <div class="text-sm">
-            <strong>Annual Leave Entry:</strong> Create annual leave records for employees. Balance is automatically checked and updated.
+            Create leave records for employees. For leave types that use balance (e.g. Annual), balance is checked and deducted. Record-only types (e.g. Sick) are just added to the record.
           </div>
         </div>
+      </div>
+
+      <div class="col-12">
+        <label class="block font-medium mb-2">Leave Type *</label>
+        <Select
+          v-model="form.leaveTypeId"
+          :options="leaveTypes"
+          optionLabel="name"
+          optionValue="id"
+          placeholder="Select leave type"
+          class="w-full"
+        >
+          <template #option="slotProps">
+            <div class="flex align-items-center justify-content-between w-full">
+              <span>{{ slotProps.option.name }}</span>
+              <Tag v-if="!slotProps.option.uses_balance" value="Record only" severity="secondary" class="text-xs" />
+            </div>
+          </template>
+        </Select>
       </div>
 
       <div class="col-12">
@@ -74,7 +93,7 @@
             <span class="font-medium">Duration:</span>
             <span class="text-lg font-bold">{{ calculatedDuration }} day{{ calculatedDuration !== 1 ? 's' : '' }}</span>
           </div>
-          <div v-if="balanceInfo" class="mt-2">
+          <div v-if="selectedLeaveType?.uses_balance && balanceInfo" class="mt-2">
             <div class="flex justify-content-between align-items-center mb-1">
               <span>Available Balance:</span>
               <span :class="balanceInfo.available >= calculatedDuration ? 'text-green-600 font-bold' : 'text-red-600 font-bold'">
@@ -94,8 +113,11 @@
               <span>{{ balanceInfo.carryOver.toFixed(1) }} days</span>
             </div>
             <div v-if="balanceInfo.available < calculatedDuration" class="mt-2 p-2 bg-red-50 border-round text-red-600 text-sm">
-              ⚠️ Insufficient annual leave balance. Available: {{ balanceInfo.available.toFixed(1) }} days, Required: {{ calculatedDuration }} days
+              ⚠️ Insufficient leave balance. Available: {{ balanceInfo.available.toFixed(1) }} days, Required: {{ calculatedDuration }} days
             </div>
+          </div>
+          <div v-else-if="selectedLeaveType && !selectedLeaveType.uses_balance" class="mt-2 p-2 bg-surface-100 border-round text-surface-600 text-sm">
+            Record only — not deducted from any balance.
           </div>
         </div>
       </div>
@@ -160,6 +182,8 @@ import { formatDateForAPI } from '@/service/dateUtils';
 import AutoComplete from 'primevue/autocomplete';
 import DatePicker from 'primevue/datepicker';
 import FileUpload from 'primevue/fileupload';
+import Select from 'primevue/select';
+import Tag from 'primevue/tag';
 import Textarea from 'primevue/textarea';
 import { useToast } from 'primevue/usetoast';
 import { computed, ref, watch } from 'vue';
@@ -194,6 +218,11 @@ const balanceInfo = ref(null);
 const selectedFile = ref(null);
 const formSubmitted = ref(false);
 
+const selectedLeaveType = computed(() => {
+  if (!form.value.leaveTypeId || !leaveTypes.value.length) return null;
+  return leaveTypes.value.find(lt => lt.id === form.value.leaveTypeId) || null;
+});
+
 const calculatedDuration = computed(() => {
   if (!form.value.startDate || !form.value.endDate) return 0;
   const start = new Date(form.value.startDate);
@@ -205,18 +234,23 @@ const calculatedDuration = computed(() => {
 });
 
 const isFormValid = computed(() => {
-  return form.value.employeeId && 
-         form.value.leaveTypeId && 
-         form.value.startDate && 
-         form.value.endDate &&
-         balanceInfo.value &&
-         balanceInfo.value.available >= calculatedDuration.value;
+  const hasBasics = form.value.employeeId &&
+    form.value.leaveTypeId &&
+    form.value.startDate &&
+    form.value.endDate &&
+    selectedFile.value;
+  if (!hasBasics) return false;
+  if (selectedLeaveType.value?.uses_balance) {
+    return balanceInfo.value != null && balanceInfo.value.available >= calculatedDuration.value;
+  }
+  return true;
 });
 
-// Watch for employee and date changes to check balance
+// Watch for employee and date changes to check balance (only for leave types that use balance)
 watch([() => form.value.employeeId, () => form.value.leaveTypeId, () => form.value.startDate, () => form.value.endDate], 
   async ([employeeId, leaveTypeId]) => {
-    if (employeeId && leaveTypeId) {
+    const lt = leaveTypes.value.find(l => l.id === leaveTypeId);
+    if (employeeId && leaveTypeId && lt?.uses_balance) {
       await checkBalance();
     } else {
       balanceInfo.value = null;
@@ -285,9 +319,8 @@ const loadLeaveTypes = async () => {
   try {
     const types = await leaveService.getLeaveTypes();
     leaveTypes.value = types;
-    // Find and set Annual leave type automatically
-    annualLeaveType.value = types.find(lt => lt.name === 'Annual' || lt.max_days === 24);
-    if (annualLeaveType.value) {
+    annualLeaveType.value = types.find(lt => lt.uses_balance) || types[0];
+    if (annualLeaveType.value && !form.value.leaveTypeId) {
       form.value.leaveTypeId = annualLeaveType.value.id;
     }
   } catch (error) {
