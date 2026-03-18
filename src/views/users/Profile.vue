@@ -219,32 +219,40 @@ onMounted(() => {
       <h2 class="text-2xl font-semibold m-0">Profile</h2>
       <div class="flex gap-2" v-if="!editMode">
         <Button 
-          label="Edit Profile" 
           icon="pi pi-pencil" 
+          rounded
+          aria-label="Edit profile"
+          v-tooltip.top="'Edit profile'"
           @click="enableEdit"
           :disabled="loading"
         />
         <Button 
-          label="Change Password" 
           icon="pi pi-key" 
           severity="secondary"
           outlined
+          rounded
+          aria-label="Change password"
+          v-tooltip.top="'Change password'"
           @click="openPasswordDialog"
           :disabled="loading"
         />
       </div>
       <div class="flex gap-2" v-else>
         <Button 
-          label="Cancel" 
           icon="pi pi-times" 
           severity="secondary"
           outlined
+          rounded
+          aria-label="Cancel"
+          v-tooltip.top="'Cancel'"
           @click="cancelEdit"
           :disabled="saving"
         />
         <Button 
-          label="Save" 
           icon="pi pi-check" 
+          rounded
+          aria-label="Save"
+          v-tooltip.top="'Save'"
           @click="saveProfile"
           :loading="saving"
         />

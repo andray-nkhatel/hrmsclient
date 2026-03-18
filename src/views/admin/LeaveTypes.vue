@@ -84,7 +84,13 @@ onMounted(() => loadLeaveTypes());
     <div class="card">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-semibold m-0">Leave Types</h2>
-            <Button label="Add Leave Type" icon="pi pi-plus" @click="openNew" />
+            <Button
+                icon="pi pi-plus"
+                rounded
+                aria-label="Add leave type"
+                v-tooltip.top="'Add leave type'"
+                @click="openNew"
+            />
         </div>
         
         <DataTable :value="leaveTypes" :loading="loading" stripedRows>

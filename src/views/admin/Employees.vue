@@ -6,6 +6,7 @@ import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import Button from 'primevue/button';
 import Calendar from 'primevue/calendar';
+import ContextMenu from 'primevue/contextmenu';
 import DataTable from 'primevue/datatable';
 import Column from 'primevue/column';
 import Dialog from 'primevue/dialog';
@@ -33,6 +34,35 @@ const uploadResult = ref(null);
 const fileInput = ref(null);
 const searchTerm = ref('');
 const viewingEmployee = ref(null);
+const contextMenu = ref(null);
+const contextMenuEmployee = ref(null);
+
+const contextMenuItems = ref([
+    {
+        label: 'Export to PDF',
+        icon: 'pi pi-file-pdf',
+        command: () => exportEmployee(contextMenuEmployee.value?.id)
+    },
+    {
+        label: 'View Annual Leave Balance',
+        icon: 'pi pi-chart-line',
+        command: () => {
+            const id = contextMenuEmployee.value?.id;
+            if (id) router.push(`/app/hr/employees/${id}/annual-leave-balance`);
+        }
+    },
+    { separator: true },
+    {
+        label: 'Edit',
+        icon: 'pi pi-pencil',
+        command: () => contextMenuEmployee.value && openEdit(contextMenuEmployee.value)
+    },
+    {
+        label: 'Delete',
+        icon: 'pi pi-trash',
+        command: () => contextMenuEmployee.value?.id && deleteEmployee(contextMenuEmployee.value.id)
+    }
+]);
 
 const roles = [
     { label: 'Employee', value: 'employee' },
@@ -79,6 +109,9 @@ const emergencyContactRelationships = [
     'Other'
 ];
 
+// Default password for new employees (no password fields on form); user can change via Profile.
+const defaultNewEmployeePassword = 'Welcome123!';
+
 const form = ref({
     id: null,
     nrc: '',
@@ -86,8 +119,6 @@ const form = ref({
     firstname: '',
     lastname: '',
     email: '',
-    password: '',
-    confirmPassword: '',
     department: '',
     role: 'employee',
     hire_date: null,
@@ -156,8 +187,6 @@ const openNew = (admin = false) => {
         firstname: '', 
         lastname: '', 
         email: '', 
-        password: '', 
-        confirmPassword: '', 
         department: '', 
         role: 'employee', 
         hire_date: null,
@@ -187,6 +216,11 @@ const openView = (item) => {
     viewDialogVisible.value = true;
 };
 
+const onRowContextMenu = (event) => {
+    contextMenuEmployee.value = event.data;
+    contextMenu.value?.show(event.originalEvent);
+};
+
 const openEdit = (item) => {
     isAdmin.value = item.role === 'admin';
     // Parse hire_date if it exists (could be from employment object or direct field)
@@ -201,7 +235,6 @@ const openEdit = (item) => {
     
     form.value = { 
         ...item, 
-        password: '',
         hire_date: hireDate,
         // Ensure all fields are present, use empty string if not provided
         phone: item.phone || '',
@@ -285,21 +318,11 @@ const saveEmployee = async () => {
                     submitting.value = false;
                     return;
                 }
-                if (!form.value.password || form.value.password.length < 6) {
-                    toast.add({ severity: 'error', summary: 'Validation Error', detail: 'Password is required (min 6 characters)', life: 3000 });
-                    submitting.value = false;
-                    return;
-                }
-                if (form.value.password !== form.value.confirmPassword) {
-                    toast.add({ severity: 'error', summary: 'Validation Error', detail: 'Password and Confirm password do not match', life: 3000 });
-                    submitting.value = false;
-                    return;
-                }
                 const adminData = {
                     username: form.value.username.trim(),
                     firstname: form.value.firstname,
                     lastname: form.value.lastname,
-                    password: form.value.password,
+                    password: defaultNewEmployeePassword,
                     department: form.value.department
                 };
                 // Add email only if provided
@@ -313,21 +336,11 @@ const saveEmployee = async () => {
                     submitting.value = false;
                     return;
                 }
-                if (!form.value.password || form.value.password.length < 6) {
-                    toast.add({ severity: 'error', summary: 'Validation Error', detail: 'Password is required (min 6 characters)', life: 3000 });
-                    submitting.value = false;
-                    return;
-                }
-                if (form.value.password !== form.value.confirmPassword) {
-                    toast.add({ severity: 'error', summary: 'Validation Error', detail: 'Password and Confirm password do not match', life: 3000 });
-                    submitting.value = false;
-                    return;
-                }
                 const createData = {
                     nrc: form.value.nrc.trim(),
                     firstname: form.value.firstname,
                     lastname: form.value.lastname,
-                    password: form.value.password,
+                    password: defaultNewEmployeePassword,
                     department: form.value.department,
                     role: form.value.role
                 };
@@ -482,7 +495,7 @@ onMounted(() => loadEmployees());
     <div class="card">
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-semibold m-0">Employees</h2>
-            <div class="flex gap-2">
+            <div class="flex items-center justify-end gap-2 flex-wrap">
                 <span class="p-input-icon-left">
                     <!-- <i class="pi pi-search" /> -->
                     <InputText 
@@ -492,15 +505,62 @@ onMounted(() => loadEmployees());
                         @input="filterEmployees"
                     />
                 </span>
-                <Button label="Export All" icon="pi pi-file-pdf" severity="danger" outlined @click="exportAllEmployees" />
-                <Button label="Download Template" icon="pi pi-download" severity="secondary" outlined @click="downloadTemplate" />
-                <Button label="Bulk Upload" icon="pi pi-upload" severity="secondary" @click="openUploadDialog" />
-                <Button label="Add Employee" icon="pi pi-plus" @click="openNew(false)" />
-                <Button label="Add Admin" icon="pi pi-user-plus" severity="secondary" @click="openNew(true)" />
+                <Button
+                    icon="pi pi-file-pdf"
+                    severity="danger"
+                    outlined
+                    rounded
+                    aria-label="Export all employees"
+                    v-tooltip.top="'Export all employees (PDF)'"
+                    @click="exportAllEmployees"
+                />
+                <Button
+                    icon="pi pi-download"
+                    severity="secondary"
+                    outlined
+                    rounded
+                    aria-label="Download template"
+                    v-tooltip.top="'Download template'"
+                    @click="downloadTemplate"
+                />
+                <Button
+                    icon="pi pi-upload"
+                    severity="secondary"
+                    rounded
+                    aria-label="Bulk upload employees"
+                    v-tooltip.top="'Bulk upload employees'"
+                    @click="openUploadDialog"
+                />
+                <Button
+                    icon="pi pi-plus"
+                    rounded
+                    aria-label="Add employee"
+                    v-tooltip.top="'Add employee'"
+                    @click="openNew(false)"
+                />
+                <Button
+                    icon="pi pi-user-plus"
+                    severity="secondary"
+                    rounded
+                    aria-label="Add admin"
+                    v-tooltip.top="'Add admin'"
+                    @click="openNew(true)"
+                />
             </div>
         </div>
         
-        <DataTable :value="filteredEmployees" :loading="loading" stripedRows paginator :rows="10" @row-click="(e) => { if (!e.originalEvent.target.closest('button')) openView(e.data); }" class="cursor-pointer">
+        <ContextMenu ref="contextMenu" :model="contextMenuItems" />
+
+        <DataTable
+            :value="filteredEmployees"
+            :loading="loading"
+            stripedRows
+            paginator
+            :rows="10"
+            @row-click="(e) => { if (!e.originalEvent.target.closest('button')) openView(e.data); }"
+            @row-contextmenu="onRowContextMenu"
+            class="cursor-pointer"
+        >
             <Column header="Name">
                 <template #body="{ data }">
                     {{ data.firstname }} {{ data.lastname }}
@@ -526,30 +586,6 @@ onMounted(() => loadEmployees());
             <Column header="Tenure">
                 <template #body="{ data }">
                     {{ getYearsServed(data) }}
-                </template>
-            </Column>
-            <Column header="Actions" style="width: 250px">
-                <template #body="{ data }">
-                    <div class="flex gap-2">
-                        <Button 
-                            icon="pi pi-file-pdf" 
-                            size="small" 
-                            severity="danger" 
-                            outlined 
-                            @click="exportEmployee(data.id)"
-                            v-tooltip.top="'Export to PDF'"
-                        />
-                        <Button 
-                            icon="pi pi-chart-line" 
-                            size="small" 
-                            severity="info" 
-                            outlined 
-                            @click="$router.push(`/app/hr/employees/${data.id}/annual-leave-balance`)"
-                            v-tooltip.top="'View Annual Leave Balance'"
-                        />
-                        <Button icon="pi pi-pencil" size="small" outlined @click="openEdit(data)" />
-                        <Button icon="pi pi-trash" size="small" severity="danger" outlined @click="deleteEmployee(data.id)" />
-                    </div>
                 </template>
             </Column>
         </DataTable>
@@ -588,14 +624,6 @@ onMounted(() => loadEmployees());
                 <div>
                     <label class="block font-medium mb-2">Department</label>
                     <Select v-model="form.department" :options="departments" placeholder="Select Department" class="w-full" />
-                </div>
-                <div v-if="!editMode" class="col-span-2">
-                    <label class="block font-medium mb-2">Password *</label>
-                    <InputText v-model="form.password" type="password" class="w-full" placeholder="Min 6 characters" autocomplete="new-password" />
-                </div>
-                <div v-if="!editMode" class="col-span-2">
-                    <label class="block font-medium mb-2">Confirm Password *</label>
-                    <InputText v-model="form.confirmPassword" type="password" class="w-full" placeholder="Re-enter password" autocomplete="new-password" />
                 </div>
                 <div v-if="!isAdmin">
                     <label class="block font-medium mb-2">Role</label>

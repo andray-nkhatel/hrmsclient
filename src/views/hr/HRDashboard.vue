@@ -226,11 +226,6 @@ const todayLeaves = ref([]);
 const upcomingLeaves = ref([]);
 const lowBalanceEmployees = ref([]);
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return '';
-  return new Date(dateStr).toLocaleDateString();
-};
-
 const getDuration = (startDate, endDate) => {
   if (!startDate || !endDate) return 0;
   const start = new Date(startDate);

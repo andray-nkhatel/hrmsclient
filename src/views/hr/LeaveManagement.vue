@@ -99,16 +99,15 @@
 
     <div v-else>
       <DataTable 
-        :value="leaves" 
+        :value="groupedEmployeesFiltered" 
         :paginator="true"
         :rows="20" 
         stripedRows
         sortMode="multiple"
-        dataKey="id"
-        :globalFilterFields="['employee.firstname', 'employee.lastname', 'leave_type.name', 'status']"
-        v-model:filters="filters"
+        dataKey="employee_id"
         scrollable
         scrollHeight="600px"
+        @row-click="openEmployeeLeaves"
       >
         <template #header>
           <div class="flex justify-content-between">
@@ -118,61 +117,114 @@
             </span>
           </div>
         </template>
-        <Column field="employee.firstname" header="Employee" sortable>
+        <Column field="employee_name" header="Employee" sortable>
           <template #body="{ data }">
-            {{ data.employee?.firstname }} {{ data.employee?.lastname }}
+            <div class="flex flex-column">
+              <span class="font-medium">{{ data.employee_name }}</span>
+              <span class="text-sm text-surface-500">{{ data.department || '-' }}</span>
+            </div>
           </template>
         </Column>
-        <Column field="leave_type.name" header="Leave Type" sortable></Column>
-        <Column field="start_date" header="Start Date" sortable>
+        <Column field="total_records" header="Records" sortable headerStyle="width: 120px" style="width: 120px">
           <template #body="{ data }">
-            {{ formatDate(data.start_date) }}
+            <Tag :value="`${data.total_records}`" severity="info" />
           </template>
         </Column>
-        <Column field="end_date" header="End Date" sortable>
+        <Column field="latest_start_date" header="Latest" sortable headerStyle="width: 200px" style="width: 200px">
           <template #body="{ data }">
-            {{ formatDate(data.end_date) }}
+            <span v-if="data.latest_start_date">{{ formatDate(data.latest_start_date) }}</span>
+            <span v-else>-</span>
           </template>
         </Column>
-        <Column header="Duration" sortable>
+        <Column field="status_summary" header="Statuses" :exportable="false">
           <template #body="{ data }">
-            {{ getDuration(data.start_date, data.end_date) }} days
-          </template>
-        </Column>
-        <Column field="status" header="Status" sortable>
-          <template #body="{ data }">
-            <Tag 
-              :value="data.status" 
-              :severity="getStatusSeverity(data.status)"
-            />
-          </template>
-        </Column>
-        <Column header="Files" :exportable="false" headerStyle="width: 120px; min-width: 120px" style="width: 120px; min-width: 120px">
-          <template #body="{ data }">
-            <div class="flex gap-2 align-items-center justify-content-center">
-              <Button
-                v-if="data.form_file_path && data.form_file_path.trim() !== ''"
-                icon="pi pi-file-pdf"
-                severity="danger"
-                text
-                rounded
-                size="small"
-                v-tooltip.top="`Download: ${data.form_file_name || 'Leave Form'}`"
-                @click="downloadLeaveForm(data)"
-                aria-label="Download Leave Form"
-                class="p-button-sm"
-              />
-              <i
-                v-else
-                class="pi pi-question-circle text-surface-400"
-                v-tooltip.top="'No file attached'"
-                style="font-size: 1.5rem; cursor: default;"
+            <div class="flex gap-2 flex-wrap">
+              <Tag
+                v-for="item in data.status_summary"
+                :key="item.status"
+                :value="`${item.status}: ${item.count}`"
+                :severity="getStatusSeverity(item.status)"
               />
             </div>
           </template>
         </Column>
       </DataTable>
     </div>
+
+    <!-- Employee Leave Records Modal -->
+    <Dialog
+      v-model:visible="employeeLeavesDialogVisible"
+      :header="selectedEmployeeGroup ? `Leave Records - ${selectedEmployeeGroup.employee_name}` : 'Leave Records'"
+      modal
+      :style="{ width: '900px' }"
+    >
+      <div v-if="selectedEmployeeGroup" class="flex flex-column gap-3">
+        <div class="flex align-items-center justify-content-between flex-wrap gap-2">
+          <div class="text-sm text-surface-500">
+            {{ selectedEmployeeGroup.department || '-' }} • {{ selectedEmployeeGroup.total_records }} record(s)
+          </div>
+        </div>
+
+        <DataTable
+          :value="selectedEmployeeGroup.records"
+          :paginator="true"
+          :rows="10"
+          stripedRows
+          sortMode="multiple"
+          dataKey="id"
+        >
+          <Column field="leave_type.name" header="Leave Type" sortable>
+            <template #body="{ data }">
+              {{ data.leave_type?.name || '-' }}
+            </template>
+          </Column>
+          <Column field="start_date" header="Start" sortable>
+            <template #body="{ data }">
+              {{ formatDate(data.start_date) }}
+            </template>
+          </Column>
+          <Column field="end_date" header="End" sortable>
+            <template #body="{ data }">
+              {{ formatDate(data.end_date) }}
+            </template>
+          </Column>
+          <Column header="Duration" sortable>
+            <template #body="{ data }">
+              {{ getDuration(data.start_date, data.end_date) }} days
+            </template>
+          </Column>
+          <Column field="status" header="Status" sortable>
+            <template #body="{ data }">
+              <Tag :value="data.status" :severity="getStatusSeverity(data.status)" />
+            </template>
+          </Column>
+          <Column header="Files" :exportable="false" headerStyle="width: 120px; min-width: 120px" style="width: 120px; min-width: 120px">
+            <template #body="{ data }">
+              <div class="flex gap-2 align-items-center justify-content-center">
+                <Button
+                  v-if="data.form_file_path && data.form_file_path.trim() !== ''"
+                  icon="pi pi-file-pdf"
+                  severity="danger"
+                  text
+                  rounded
+                  size="small"
+                  v-tooltip.top="`Download: ${data.form_file_name || 'Leave Form'}`"
+                  @click="downloadLeaveForm(data)"
+                  aria-label="Download Leave Form"
+                  class="p-button-sm"
+                />
+                <i
+                  v-else
+                  class="pi pi-question-circle text-surface-400"
+                  v-tooltip.top="'No file attached'"
+                  style="font-size: 1.5rem; cursor: default;"
+                />
+              </div>
+            </template>
+          </Column>
+        </DataTable>
+      </div>
+    </Dialog>
 
     <!-- Quick Leave Entry Dialog -->
     <QuickLeaveEntry 
@@ -206,7 +258,7 @@ import InputText from 'primevue/inputtext';
 import ProgressSpinner from 'primevue/progressspinner';
 import Tag from 'primevue/tag';
 import { useToast } from 'primevue/usetoast';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import BulkLeaveImport from './BulkLeaveImport.vue';
 import LeaveTemplateDialog from './LeaveTemplateDialog.vue';
 import QuickLeaveEntry from './QuickLeaveEntry.vue';
@@ -217,12 +269,75 @@ const leaves = ref([]);
 const showQuickEntry = ref(false);
 const showBulkImport = ref(false);
 const showTemplateDialog = ref(false);
+const employeeLeavesDialogVisible = ref(false);
+const selectedEmployeeGroup = ref(null);
 
 
 
 const filters = ref({
   global: { value: null, matchMode: 'contains' }
 });
+
+const groupedEmployees = computed(() => {
+  const map = new Map();
+
+  for (const leave of leaves.value || []) {
+    const emp = leave.employee || {};
+    const employeeId = emp.id ?? leave.employee_id ?? leave.employeeId;
+    const first = emp.firstname || '';
+    const last = emp.lastname || '';
+    const employeeName = `${first} ${last}`.trim() || 'Unknown';
+    const department = emp.department || leave.employee?.department || null;
+
+    const key = employeeId ?? employeeName;
+    if (!map.has(key)) {
+      map.set(key, {
+        employee_id: employeeId ?? key,
+        employee_name: employeeName,
+        department,
+        records: []
+      });
+    }
+    map.get(key).records.push(leave);
+  }
+
+  const groups = Array.from(map.values()).map(group => {
+    const recordsSorted = [...group.records].sort((a, b) => new Date(b.start_date) - new Date(a.start_date));
+    const latest = recordsSorted[0];
+
+    const counts = new Map();
+    for (const rec of group.records) {
+      const status = rec.status || 'Unknown';
+      counts.set(status, (counts.get(status) || 0) + 1);
+    }
+    const statusSummary = Array.from(counts.entries()).map(([status, count]) => ({ status, count }));
+
+    return {
+      ...group,
+      records: recordsSorted,
+      total_records: group.records.length,
+      latest_start_date: latest?.start_date || null,
+      status_summary: statusSummary
+    };
+  });
+
+  return groups;
+});
+
+const groupedEmployeesFiltered = computed(() => {
+  const q = (filters.value.global.value || '').toString().toLowerCase().trim();
+  if (!q) return groupedEmployees.value;
+
+  return groupedEmployees.value.filter(g => {
+    const hay = `${g.employee_name} ${g.department || ''}`.toLowerCase();
+    return hay.includes(q);
+  });
+});
+
+const openEmployeeLeaves = (event) => {
+  selectedEmployeeGroup.value = event.data;
+  employeeLeavesDialogVisible.value = true;
+};
 
 const getDuration = (startDate, endDate) => {
   if (!startDate || !endDate) return 0;

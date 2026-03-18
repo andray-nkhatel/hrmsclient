@@ -68,8 +68,24 @@ onMounted(() => {
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-semibold m-0">Leave Audit Trail</h2>
             <div class="flex gap-2">
-                <Button icon="pi pi-refresh" outlined @click="loadAuditTrail" :loading="loading" />
-                <Button label="Back" severity="secondary" outlined @click="$router.back()" />
+                <Button
+                    icon="pi pi-refresh"
+                    outlined
+                    rounded
+                    aria-label="Refresh audit trail"
+                    v-tooltip.top="'Refresh'"
+                    @click="loadAuditTrail"
+                    :loading="loading"
+                />
+                <Button
+                    icon="pi pi-arrow-left"
+                    severity="secondary"
+                    outlined
+                    rounded
+                    aria-label="Back"
+                    v-tooltip.top="'Back'"
+                    @click="$router.back()"
+                />
             </div>
         </div>
 

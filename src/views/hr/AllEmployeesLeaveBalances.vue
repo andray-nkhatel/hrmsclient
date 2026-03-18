@@ -17,40 +17,50 @@
     </div>
     <div class="flex gap-2 align-items-center flex-wrap mb-4">
       <Button 
-        label="Quick Entry" 
         icon="pi pi-plus" 
         @click="showQuickEntry = true"
         severity="success"
+        rounded
+        aria-label="Quick entry"
+        v-tooltip.top="'Quick entry'"
       />
       <Button 
-        label="Bulk Import" 
         icon="pi pi-upload" 
         @click="showBulkImport = true"
         severity="info"
         outlined
+        rounded
+        aria-label="Bulk import"
+        v-tooltip.top="'Bulk import'"
       />
       <Button 
-        label="Export Excel" 
         icon="pi pi-file-excel" 
         @click="exportToExcel" 
         :loading="exporting"
         severity="success"
         outlined
+        rounded
+        aria-label="Export Excel"
+        v-tooltip.top="'Export Excel'"
       />
       <Button 
-        label="Export PDF" 
         icon="pi pi-file-pdf" 
         @click="exportToPDF" 
         :loading="exporting"
         severity="danger"
         outlined
+        rounded
+        aria-label="Export PDF"
+        v-tooltip.top="'Export PDF'"
       />
       <Button 
-        label="Refresh" 
         icon="pi pi-refresh" 
         @click="loadBalances" 
         :loading="loading"
         outlined
+        rounded
+        aria-label="Refresh"
+        v-tooltip.top="'Refresh'"
       />
     </div>
 

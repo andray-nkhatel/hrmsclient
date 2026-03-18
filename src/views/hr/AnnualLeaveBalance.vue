@@ -1,47 +1,57 @@
 <template>
   <div class="card">
-    <div class="flex justify-content-between align-items-center mb-4 w-full">
-      <h2 class="text-2xl font-semibold m-0 flex-shrink-0">
+    <div class="mb-4 w-full">
+      <h2 class="text-2xl font-semibold m-0">
         Annual Leave Balance
         <span v-if="balance" class="text-primary ml-2">{{ balance.employee_name }}</span>
       </h2>
-      <div class="flex gap-2 flex-shrink-0">
+      <div class="flex items-center justify-end gap-2 flex-wrap mt-3">
         <Button 
-          label="Export Excel" 
           icon="pi pi-file-excel" 
           @click="exportToExcel" 
           :loading="exporting"
           severity="success"
           outlined
+          rounded
+          aria-label="Export Excel"
+          v-tooltip.top="'Export Excel'"
         />
         <Button 
-          label="Export PDF" 
           icon="pi pi-file-pdf" 
           @click="exportToPDF" 
           :loading="exporting"
           severity="danger"
           outlined
+          rounded
+          aria-label="Export PDF"
+          v-tooltip.top="'Export PDF'"
         />
         <Button 
-          label="Import CSV" 
           icon="pi pi-upload" 
           @click="openImportDialog" 
           severity="info"
           outlined
+          rounded
+          aria-label="Import CSV"
+          v-tooltip.top="'Import CSV'"
         />
         <Button 
-          label="Add Accruals" 
           icon="pi pi-plus" 
           @click="openAccrualDialog" 
           severity="success"
           outlined
+          rounded
+          aria-label="Add accruals"
+          v-tooltip.top="'Add accruals'"
         />
         <Button 
-          label="Refresh" 
           icon="pi pi-refresh" 
           @click="loadBalance" 
           :loading="loading"
           outlined
+          rounded
+          aria-label="Refresh"
+          v-tooltip.top="'Refresh'"
         />
       </div>
     </div>

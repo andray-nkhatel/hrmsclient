@@ -46,7 +46,12 @@ onMounted(() => {
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-semibold m-0">My Leave History</h2>
             <router-link to="/app/leaves/apply">
-                <Button label="Apply for Leave" icon="pi pi-plus" />
+                <Button
+                    icon="pi pi-plus"
+                    rounded
+                    aria-label="Apply for leave"
+                    v-tooltip.top="'Apply for leave'"
+                />
             </router-link>
         </div>
         
