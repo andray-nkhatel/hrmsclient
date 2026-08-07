@@ -510,7 +510,10 @@ export const hrLeaveService = {
     const params = new URLSearchParams();
     if (filters.department) params.append('department', filters.department);
     if (filters.status) params.append('status', filters.status);
-    const response = await apiClient.get(`/api/hr/employees/annual-leave-balances?${params.toString()}`);
+    // This list endpoint aggregates all employees; allow longer than the default 10s timeout
+    const response = await apiClient.get(`/api/hr/employees/annual-leave-balances?${params.toString()}`, {
+      timeout: 60000
+    });
     return response.data;
   },
 
